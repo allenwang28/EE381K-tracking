@@ -11,14 +11,13 @@ import frame_object as fo
 fileDir = os.path.dirname(os.path.realpath(__file__))
 vidDir = os.path.join(fileDir, '..', 'videos')
 
-defaultVidPath = os.path.join(vidDir, 'uclawash-1.mp4')
+defaultVidPath = os.path.join(vidDir, 'housas-1.mp4')
 
 def main(args):
     cap = cv2.VideoCapture(args.vid)
 
     currentFrame = 0
-#    capLength = int(cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
-    capLength = 210
+    capLength = int(cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
 
     if args.verbose:
         print(("#===== Opening {} =====#".format(args.vid)))
@@ -39,7 +38,7 @@ def main(args):
         try:
             frameObject = fo.FrameObject(img, currentFrame, args.vid)
             #frameObject.show_lines()
-            frameObject.show_points()
+            #frameObject.show_points()
             raw_input()
         except Exception as inst:
             print(inst)
