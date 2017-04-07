@@ -6,9 +6,31 @@ import matplotlib.pyplot as plt
 import os
 import cv2
 
-if __name__ == "__main__":
-    fileDir = os.path.dirname(os.path.realpath(__file__))
-    vidDir = os.path.join(fileDir, '..', 'videos')
+from colors import get_crowdless_image
+
+fileDir = os.path.dirname(os.path.realpath(__file__))
+vidDir = os.path.join(fileDir, '..', 'videos')
+imgDir = os.path.join(fileDir, '..', 'images')
+
+sampleImgPath = os.path.join(imgDir, 'test.jpg')
+
+def blobTest():
+    img = cv2.imread(sampleImgPath)
+    img = get_crowdless_image(img)
+    gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # gray_img = get_crowdless_image(gray_img)
+
+    detector = cv2.SimpleBlobDetector()
+
+    keypoints = detector.detect(gray_img)
+
+    im_with_keypoints = cv2.drawKeypoints(img, keypoints, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+
+    cv2.imshow("Keypoints", im_with_keypoints)
+    cv2.waitKey(0)
+
+
+def clusterTest():
 
     #defaultVidPath = os.path.join(vidDir, 'housas-1.mp4')
     defaultVidPath = os.path.join(vidDir, 'gswokc-1.mp4')
@@ -54,3 +76,7 @@ if __name__ == "__main__":
             break
     cv2.destroyAllWindows()
     cap.release()
+
+if __name__ == "__main__":
+    blobTest()
+

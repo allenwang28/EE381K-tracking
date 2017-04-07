@@ -19,6 +19,8 @@ YCBCR_WHITE = (255,128,128)
 
 
 # Exported code ---------------------------------
+def get_crowdless_image(img):
+    return img[int(CROWD_TOP_HEIGHT_FRACTION*img.shape[0]) : int(-CROWD_BOTTOM_HEIGHT_FRACTION*img.shape[0])]
 
 def create_court_mask(_bgr_img, dominant_colorset, binary_gray=False):
     img = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2YCR_CB)
@@ -33,13 +35,50 @@ def create_court_mask(_bgr_img, dominant_colorset, binary_gray=False):
 
     return ycbcr_to_gray(img) if binary_gray else img
 
+def get_color_hist(_bgr_img, thresh=0.02, ignore_crowd=True, peak_num=1):
+    img = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2YCR_CB)
+
+    if ignore_crowd:
+        get_crowdless_image(_bgr_img)
+
+    hist = cv2.calcHist([img], [1,2], None, [256,256], [0,256, 0,256])
+    # return hist
+
+    peak1_flat_idx = np.argmax(hist)
+    peak1_idx = np.unravel_index(peak1_flat_idx, hist.shape)
+    peak1_val = hist[peak1_idx]
+    connected_hist1, sum1, subtracted_hist = get_connected_hist(hist, peak1_idx, thresh)
+    return connected_hist1
+    # return get_connected_hist(hist, peak1_idx, thresh)
+
+
+def get_dominant_colorset(_bgr_img, thresh=0.02, ignore_crowd=True,
+    peak_num=1):
+    img = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2YCR_CB)
+
+    if ignore_crowd:
+        get_crowdless_image(_bgr_img)
+
+    hist = cv2.calcHist([img], [1,2], None, [256,256], [0,256, 0,256])
+
+    subtracted_hist = hist.copy()
+    connected_hist = None
+
+    for _ in xrange(peak_num):
+        peak_flat_idx = np.argmax(subtracted_hist)
+        peak_idx = np.unravel_index(peak_flat_idx, subtracted_hist.shape)
+        peak_val = hist[peak_idx]
+        connected_hist, sumX, subtracted_hist = get_connected_hist(subtracted_hist, peak_idx, thresh)
+    return connected_hist
+
+"""
 #.02
 def get_dominant_colorset(_bgr_img, thresh=0.02, ignore_crowd=True,
     peak_num=1):
     img = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2YCR_CB)
 
     if ignore_crowd:
-        img = img[int(CROWD_TOP_HEIGHT_FRACTION*img.shape[0]) : int(-CROWD_BOTTOM_HEIGHT_FRACTION*img.shape[0])]
+        get_crowdless_image(_bgr_img)
 
     hist = cv2.calcHist([img], [1,2], None, [256,256], [0,256, 0,256])
 
@@ -57,6 +96,7 @@ def get_dominant_colorset(_bgr_img, thresh=0.02, ignore_crowd=True,
     connected_hist2, sum2, subtracted_hist = get_connected_hist(subtracted_hist, peak2_idx, thresh)
 
     return connected_hist2
+"""
 
 def get_double_flooded_mask(gray_mask):
     gray_flooded = fill_holes_with_contour_filling(gray_mask)
@@ -117,8 +157,15 @@ def show_image(img):
     if cv2.waitKey(0) & 0xff == 27:
         cv2.destroyAllWindows()
 
+def show_hist(img, hist):
+    plt.subplot(221)
+    plt.imshow(img)
+    plt.subplot(222)
+    plt.plot(hist)
+    plt.xlim([0,256])
+    plt.show()
 
-def show_hist(hist_list):
+def show_hist_list(hist_list):
     for i, hist in enumerate(hist_list):
         plt.subplot(1, len(hist_list), i+1)
         plt.imshow(hist, interpolation = 'nearest')
@@ -155,9 +202,27 @@ def show_binary(binary):
     plt.show()
 
 if __name__ == '__main__':
-    # image_root = 'images/6175'
-    image_root = 'images/5993'
-    image_ext = '.jpg'
-    image_name = image_root + image_ext
+    import os
 
-    img = get_paint_mask(image_name)
+    fileDir = os.path.dirname(os.path.realpath(__file__))
+    vidDir = os.path.join(fileDir, '..', 'videos')
+    imgDir = os.path.join(fileDir, '..', 'images')
+
+    sampleImgPath = os.path.join(imgDir, 'test.jpg')
+
+    img = cv2.imread(sampleImgPath)
+    #img = get_crowdless_image(img)
+
+    dominantColorset = get_dominant_colorset(img, thresh=0.03, ignore_crowd = True, peak_num=3)
+    #dominantColorset = get_dominant_colorset(img, thresh=0.02, ignore_crowd = False, peak_num=3)
+
+    imgCpy = img.copy()
+
+    grayMask = create_court_mask(imgCpy, dominantColorset, True)
+
+    cv2.imshow('mask', grayMask)
+
+    cv2.imshow('original', img)
+
+    cv2.waitKey(0)
+
