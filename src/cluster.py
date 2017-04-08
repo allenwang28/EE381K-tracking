@@ -14,6 +14,15 @@ imgDir = os.path.join(fileDir, '..', 'images')
 
 sampleImgPath = os.path.join(imgDir, 'test.jpg')
 
+def centroidTest():
+    img = cv2.imread(sampleImgPath, 0)
+    ret, thresh = cv2.threshold(img, 127, 255, 0)
+    contours, hierarchy = cv2.findContours(thresh, 1, 2)
+
+    cnt = contours[0]
+    M = cv2.moments(cnt)
+    print M
+
 def blobTest():
     img = cv2.imread(sampleImgPath)
     img = get_crowdless_image(img)
@@ -78,5 +87,5 @@ def clusterTest():
     cap.release()
 
 if __name__ == "__main__":
-    blobTest()
+    centroidTest()
 
