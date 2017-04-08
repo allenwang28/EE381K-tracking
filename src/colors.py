@@ -8,7 +8,8 @@ from collections import deque
 
 # Constants -------------------------------------
 
-CROWD_TOP_HEIGHT_FRACTION = .375;
+#CROWD_TOP_HEIGHT_FRACTION = .375;
+CROWD_TOP_HEIGHT_FRACTION = .35;
 CROWD_BOTTOM_HEIGHT_FRACTION = .2;
 BGR_BLACK = (0,0,0)
 BGR_RED = (0, 0, 255)
@@ -21,6 +22,50 @@ YCBCR_WHITE = (255,128,128)
 # Exported code ---------------------------------
 def get_crowdless_image(img):
     return img[int(CROWD_TOP_HEIGHT_FRACTION*img.shape[0]) : int(-CROWD_BOTTOM_HEIGHT_FRACTION*img.shape[0])]
+
+def get_home_jersey_mask(_bgr_img):
+    # Typically home jerseys are white
+    gray = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2GRAY) 
+    ret, gray = cv2.threshold(gray, 127, 255, 0)
+    gray2 = gray.copy()
+    mask = np.zeros(gray.shape, np.uint8)
+
+    contours, hier = cv2.findContours(gray, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    for cnt in contours:
+        if 200 < cv2.contourArea(cnt) < 5000:
+            cv2.drawContours(_bgr_img, [cnt], 0, (0, 255, 0), 2)
+            cv2.drawContours(mask, [cnt], 0, 255, -1)
+    return _bgr_img
+
+
+def get_away_jersey_mask(_bgr_img, lower, upper):
+    img_hsv = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2HSV)
+    img_hsv = cv2.inRange(img_hsv, lower, upper)
+
+    """
+    element = np.ones((5,5)).astype(np.uint8)
+    img_hsv = cv2.erode(img_hsv, element)
+    img_hsv = cv2.dilate(img_hsv, element)
+    """
+    return img_hsv
+
+
+    """
+    # Remove smaller elements
+    element = np.ones((5,5)).astype(np.uint8)
+    img_hsv = cv2.erode(img_hsv, element)
+    img_hsv = cv2.dilate(img_hsv, element)
+    return img_colored
+
+    points = np.dstack(np.where(img_hsv>0)).astype(np.float32)
+    # fit a bounding circle to the colored points
+    center, radius = cv2.minEnclosingCircle(points)
+
+    cv2.circle(img, (int(center[1]), int(center[0])),int(radius), (255,0,0), thickness=3)
+    out = np.vstack([img_colored, img])
+    """
+
+
 
 def create_court_mask(_bgr_img, dominant_colorset, binary_gray=False):
     img = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2YCR_CB)
@@ -210,19 +255,37 @@ if __name__ == '__main__':
 
     sampleImgPath = os.path.join(imgDir, 'test.jpg')
 
-    img = cv2.imread(sampleImgPath)
-    #img = get_crowdless_image(img)
 
-    dominantColorset = get_dominant_colorset(img, thresh=0.03, ignore_crowd = True, peak_num=3)
+
+    img = cv2.imread(sampleImgPath)
+
+    # img = get_crowdless_image(img)
+
+    #dominantColorset = get_dominant_colorset(img, thresh=0.03, ignore_crowd = True, peak_num=3)
     #dominantColorset = get_dominant_colorset(img, thresh=0.02, ignore_crowd = False, peak_num=3)
 
     imgCpy = img.copy()
 
-    grayMask = create_court_mask(imgCpy, dominantColorset, True)
+#    color1 = (235,82,49)
+#    color2 = (229,94,36)
 
-    cv2.imshow('mask', grayMask)
+    # color1 = (0, 100, 100)
+    # color2 = (20, 255, 255)
+
+    # GSW jerseys
+    color1 = (115, 190, 80)
+    color2 = (125, 260, 260)
+
+
+    # mask = get_away_jersey_mask(imgCpy, color1, color2)
+    mask = get_home_jersey_mask(imgCpy)
+
+    # grayMask = create_court_mask(imgCpy, dominantColorset, True)
+
+    # cv2.imshow('mask', grayMask)
 
     cv2.imshow('original', img)
+    cv2.imshow('mask', mask)
 
     cv2.waitKey(0)
 

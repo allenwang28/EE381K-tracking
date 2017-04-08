@@ -13,6 +13,10 @@ vidDir = os.path.join(fileDir, '..', 'videos')
 
 defaultVidPath = os.path.join(vidDir, 'housas-1.mp4')
 
+# --------- CONSTANTS
+GSW_JERSEY_UPPER = (115, 190, 80)
+GSW_JERSEY_LOWER = (125, 260, 260)
+
 def main(args):
     cap = cv2.VideoCapture(args.vid)
 
