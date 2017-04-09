@@ -28,35 +28,22 @@ def remap_from_crowdless_coords(original_img, coords):
 def get_crowdless_image(img):
     return img[int(CROWD_TOP_HEIGHT_FRACTION*img.shape[0]) : int(-CROWD_BOTTOM_HEIGHT_FRACTION*img.shape[0])]
 
-def get_home_jersey_mask(_bgr_img):
-    hsv = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2HSV)
-    # define range of white color in HSV
-    # change it according to your need !
-    lower_white = np.array([0,0,230], dtype=np.uint8)
-    upper_white = np.array([255,25,255], dtype=np.uint8)
+def get_jersey_mask(_bgr_img, lower, upper, binary_gray=True):
+    img = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2YCR_CB)
+    for row in xrange(img.shape[0]):
+        for col in xrange(img.shape[1]):
+            idx = (row, col)
+            _, cr, cb = img[idx]
+            if (cr, cb) not in lower:
+                img[idx] = YCBCR_BLACK
+            elif binary_gray:
+                img[idx] = YCBCR_WHITE
 
-    # Threshold the HSV image to get only white colors
-    mask = cv2.inRange(hsv, lower_white, upper_white)
-    # Bitwise-AND mask and original image
-    res = cv2.bitwise_and(_bgr_img,_bgr_img, mask= mask)
-    return res
-    """
-    # Typically home jerseys are white
-    gray = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2GRAY) 
-    ret, gray = cv2.threshold(gray, 127, 255, 0)
-    gray2 = gray.copy()
-    mask = np.zeros(gray.shape, np.uint8)
-
-    contours, hier = cv2.findContours(gray, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    for cnt in contours:
-        if 200 < cv2.contourArea(cnt) < 5000:
-            cv2.drawContours(_bgr_img, [cnt], 0, (0, 255, 0), 2)
-            cv2.drawContours(mask, [cnt], 0, 255, -1)
-    return _bgr_img
-    """
+    return ycbcr_to_gray(img) if binary_gray else img
 
 
-def get_away_jersey_mask(_bgr_img, lower, upper):
+"""
+def get_jersey_mask(_bgr_img, lower, upper):
     img_hsv = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2HSV)
     img_hsv = cv2.inRange(img_hsv, lower, upper)
 
@@ -64,6 +51,7 @@ def get_away_jersey_mask(_bgr_img, lower, upper):
     img_hsv = cv2.erode(img_hsv, element)
     img_hsv = cv2.dilate(img_hsv, element)
     return img_hsv
+"""
 
 def create_court_mask(_bgr_img, dominant_colorset, binary_gray=False):
     img = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2YCR_CB)
@@ -274,8 +262,10 @@ if __name__ == '__main__':
     color1 = (115, 190, 80)
     color2 = (125, 260, 260)
 
+    color = (142, 142)
 
-    # mask = get_away_jersey_mask(imgCpy, color1, color2)
+
+    # mask = get_jersey_mask(imgCpy, color1, color2)
     mask = get_home_jersey_mask(imgCpy)
 
     # grayMask = create_court_mask(imgCpy, dominantColorset, True)

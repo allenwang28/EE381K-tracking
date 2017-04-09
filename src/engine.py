@@ -15,8 +15,30 @@ vidDir = os.path.join(fileDir, '..', 'videos')
 defaultVidPath = os.path.join(vidDir, 'gswokc-1.mp4')
 
 # --------- CONSTANTS
-GSW_JERSEY_LOWER = (115, 190, 80)
-GSW_JERSEY_UPPER = (125, 260, 260)
+"""
+# HSV
+GSW_AWAY_LOWER = (115, 190, 50)
+GSW_AWAY_UPPER = (125, 260, 260)
+GSW_AWAY = (GSW_AWAY_LOWER, GSW_AWAY_UPPER)
+
+#OKC_HOME_LOWER = (125, 50, 140)
+#OKC_HOME_UPPER = (145, 255, 255)
+OKC_HOME_LOWER = (125, 0, 200)
+OKC_HOME_UPPER = (145, 100, 255)
+OKC_HOME = (OKC_HOME_LOWER, OKC_HOME_UPPER)
+"""
+
+# YCBCR
+
+GSW_AWAY_LOWER = (177, 118)
+GSW_AWAY_UPPER = (180, 118)
+
+GSW_AWAY = (GSW_AWAY_LOWER, GSW_AWAY_UPPER)
+
+
+OKC_HOME_LOWER = (140, 142)
+OKC_HOME_UPPER = (142, 142)
+OKC_HOME = (OKC_HOME_LOWER, OKC_HOME_UPPER)
 
 def main(args):
     cap = cv2.VideoCapture(args.vid)
@@ -41,8 +63,10 @@ def main(args):
         # Operations goes here
 
         try:
-            frameObject = fo.FrameObject(img, currentFrame, args.vid, (GSW_JERSEY_LOWER, GSW_JERSEY_UPPER))
+            frameObject = fo.FrameObject(img, currentFrame, args.vid, GSW_AWAY, OKC_HOME)
             frameObject.show_away_player_coordinates()
+            #frameObject.show_home_player_coordinates()
+
             #frameObject.show_lines()
             #frameObject.show_points()
             raw_input()

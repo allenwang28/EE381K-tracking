@@ -33,7 +33,7 @@ def centroidTest():
     img = cv2.imread(sampleImgPath)
 
     img = colors.get_crowdless_image(img)
-    mask = colors.get_away_jersey_mask(img, (115, 190, 80), (125, 260, 260))
+    mask = colors.get_jersey_mask(img, (115, 190, 80), (125, 260, 260))
 
     print getCentroids(mask)
 

@@ -22,6 +22,8 @@ class FrameObject():
     _gray_flooded2 = None
     _away_colors = None
     _away_mask = None
+    _home_colors = None
+    _home_mask = None
     # Lines
     _sideline = None
     _baseline = None
@@ -40,13 +42,15 @@ class FrameObject():
     _sideline_freethrow = None # Int btw far sideline and freethrow line
 
     _away_player_coordinates = None
+    _home_player_coordinates = None
 
-    def __init__(self, img, frame_num, video_title, away_colors):
+    def __init__(self, img, frame_num, video_title, away_colors, home_colors):
         assert img is not None
         self._bgr_img = img
         self._frame_num = frame_num
         self._video_title = video_title
         self._away_colors = away_colors
+        self._home_colors = home_colors
 
     # Exported methods
     def get_gray_mask(self):
@@ -128,8 +132,16 @@ class FrameObject():
     def get_away_jersey_mask(self):
         if self._away_mask is None:
             crowdlessImg = colors.get_crowdless_image(self.get_bgr_img())
-            self._away_mask = colors.get_away_jersey_mask(crowdlessImg, self._away_colors[0], self._away_colors[1])
+            self._away_mask = colors.get_jersey_mask(crowdlessImg, self._away_colors[0], self._away_colors[1])
         return self._away_mask
+
+
+    def get_home_jersey_mask(self):
+        if self._home_mask is None:
+            crowdlessImg = colors.get_crowdless_image(self.get_bgr_img())
+            self._home_mask = colors.get_jersey_mask(crowdlessImg, self._home_colors[0], self._home_colors[1])
+        return self._home_mask
+
 
     def get_away_player_coordinates(self):
         if self._away_player_coordinates is None:
@@ -148,6 +160,21 @@ class FrameObject():
         cv2.imshow('away players', circleImg)
 
 
+    def get_home_player_coordinates(self):
+        if self._home_player_coordinates is None:
+            self._home_player_coordinates = cluster.getCentroids(self.get_home_jersey_mask())
+            self._home_player_coordinates = colors.remap_from_crowdless_coords(self.get_bgr_img(), self._home_player_coordinates)
+        return self._home_player_coordinates
+
+    def show_home_player_coordinates(self):
+        coordinates = self.get_home_player_coordinates()
+        circleImg = self.get_bgr_img()
+        print coordinates
+        for (x,y) in coordinates:
+            circs = cv2.circle(circleImg, (x,y), 5, (255, 255, 255), -1)
+            print x
+            print y
+        cv2.imshow('home players', circleImg)
 
     def show_lines(self):
         lines = [self.get_freethrowline(), self.get_close_paintline(),
