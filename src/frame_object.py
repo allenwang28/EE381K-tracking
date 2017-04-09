@@ -9,6 +9,7 @@ import colors
 import top_line_detection as tld
 import hough
 from geometry import get_intersection
+import cluster
 
 class FrameObject():
     # Variables
@@ -19,6 +20,8 @@ class FrameObject():
     _gray_mask = None
     _dominant_colorset = None
     _gray_flooded2 = None
+    _away_colors = None
+    _away_mask = None
     # Lines
     _sideline = None
     _baseline = None
@@ -36,11 +39,14 @@ class FrameObject():
     _close_paint_freethrow = None # Int btw close paintline and freethrow line
     _sideline_freethrow = None # Int btw far sideline and freethrow line
 
-    def __init__(self, img, frame_num, video_title):
+    _away_player_coordinates = None
+
+    def __init__(self, img, frame_num, video_title, away_colors):
         assert img is not None
         self._bgr_img = img
         self._frame_num = frame_num
         self._video_title = video_title
+        self._away_colors = away_colors
 
     # Exported methods
     def get_gray_mask(self):
@@ -117,6 +123,31 @@ class FrameObject():
         pts.append(get_intersection(self.get_close_paintline(), self.get_baseline()))
         pts.append(get_intersection(self.get_close_paintline(), self.get_freethrowline()))
         return pts
+
+
+    def get_away_jersey_mask(self):
+        if self._away_mask is None:
+            crowdlessImg = colors.get_crowdless_image(self.get_bgr_img())
+            self._away_mask = colors.get_away_jersey_mask(crowdlessImg, self._away_colors[0], self._away_colors[1])
+        return self._away_mask
+
+    def get_away_player_coordinates(self):
+        if self._away_player_coordinates is None:
+            self._away_player_coordinates = cluster.getCentroids(self.get_away_jersey_mask())
+            self._away_player_coordinates = colors.remap_from_crowdless_coords(self.get_bgr_img(), self._away_player_coordinates)
+        return self._away_player_coordinates
+
+    def show_away_player_coordinates(self):
+        coordinates = self.get_away_player_coordinates()
+        circleImg = self.get_bgr_img()
+        print coordinates
+        for (x,y) in coordinates:
+            circs = cv2.circle(circleImg, (x,y), 5, (255, 255, 255), -1)
+            print x
+            print y
+        cv2.imshow('away players', circleImg)
+
+
 
     def show_lines(self):
         lines = [self.get_freethrowline(), self.get_close_paintline(),
@@ -197,24 +228,23 @@ def testpoints(img_obj, save_filename):
 
 
 if __name__ == '__main__':
-    # image_name = 'images/5993.jpg'
-    # pickle_name = 'pickles/5993_gray_mask.pickle'
-    # gray_mask = pickle.load(open(pickle_name, 'r'))
-    image_nums = [5993]
-    # image_nums = ['gsw2']
-    # image_nums = [5993, 6233, 6373, 6584, 6691, 6882, 6006]
-    # image_nums = [5993, 6233, 6373, 6584, 'alex']
-    for image_num in image_nums:
-        print (image_num)
-        image_name = '../images/{}.jpg'.format(image_num)
-        save_name = '../images/{}'.format(image_num)
-        save_filename = '../images/4lines{}.jpg'.format(image_num)
-        img_obj = FrameObject(image_name, save_name, verbose=False)
-        testlines(img_obj, save_filename)
-        save_filename = '../images/4points{}.jpg'.format(image_num)
-        testpoints(img_obj, save_filename)
+    import os
+    fileDir = os.path.dirname(os.path.realpath(__file__))
+    imgDir = os.path.join(fileDir, '..', 'images')
+
+    sampleImgPath = os.path.join(imgDir, 'test.jpg')
+    GSW_JERSEY_UPPER = (115, 190, 80)
+    GSW_JERSEY_LOWER = (125, 260, 260)
+
+    img = cv2.imread(sampleImgPath)
+    
+    fo = FrameObject(img, 0, '', (GSW_JERSEY_UPPER, GSW_JERSEY_LOWER))
+
+    fo.show_away_player_coordinates()
+
+    cv2.waitKey(0)
 
 
-    # colors.show_image(img_obj.get_gray_flooded2())
-    # pickle.dump(img_obj.get_gray_mask(), open(pickle_name, 'w'))
-    print ('Done')
+    
+
+

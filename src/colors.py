@@ -18,12 +18,29 @@ YCBCR_BLACK = (0,128,128)
 YCBCR_WHITE = (255,128,128)
 
 
-
 # Exported code ---------------------------------
+def remap_from_crowdless_coords(original_img, coords):
+    new_coords = []
+    for (x,y) in coords:
+        new_coords.append((x, int(y + CROWD_TOP_HEIGHT_FRACTION*original_img.shape[0])))
+    return new_coords 
+
 def get_crowdless_image(img):
     return img[int(CROWD_TOP_HEIGHT_FRACTION*img.shape[0]) : int(-CROWD_BOTTOM_HEIGHT_FRACTION*img.shape[0])]
 
 def get_home_jersey_mask(_bgr_img):
+    hsv = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2HSV)
+    # define range of white color in HSV
+    # change it according to your need !
+    lower_white = np.array([0,0,230], dtype=np.uint8)
+    upper_white = np.array([255,25,255], dtype=np.uint8)
+
+    # Threshold the HSV image to get only white colors
+    mask = cv2.inRange(hsv, lower_white, upper_white)
+    # Bitwise-AND mask and original image
+    res = cv2.bitwise_and(_bgr_img,_bgr_img, mask= mask)
+    return res
+    """
     # Typically home jerseys are white
     gray = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2GRAY) 
     ret, gray = cv2.threshold(gray, 127, 255, 0)
@@ -36,36 +53,17 @@ def get_home_jersey_mask(_bgr_img):
             cv2.drawContours(_bgr_img, [cnt], 0, (0, 255, 0), 2)
             cv2.drawContours(mask, [cnt], 0, 255, -1)
     return _bgr_img
+    """
 
 
 def get_away_jersey_mask(_bgr_img, lower, upper):
     img_hsv = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2HSV)
     img_hsv = cv2.inRange(img_hsv, lower, upper)
 
-    """
     element = np.ones((5,5)).astype(np.uint8)
     img_hsv = cv2.erode(img_hsv, element)
     img_hsv = cv2.dilate(img_hsv, element)
-    """
     return img_hsv
-
-
-    """
-    # Remove smaller elements
-    element = np.ones((5,5)).astype(np.uint8)
-    img_hsv = cv2.erode(img_hsv, element)
-    img_hsv = cv2.dilate(img_hsv, element)
-    return img_colored
-
-    points = np.dstack(np.where(img_hsv>0)).astype(np.float32)
-    # fit a bounding circle to the colored points
-    center, radius = cv2.minEnclosingCircle(points)
-
-    cv2.circle(img, (int(center[1]), int(center[0])),int(radius), (255,0,0), thickness=3)
-    out = np.vstack([img_colored, img])
-    """
-
-
 
 def create_court_mask(_bgr_img, dominant_colorset, binary_gray=False):
     img = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2YCR_CB)
@@ -259,7 +257,7 @@ if __name__ == '__main__':
 
     img = cv2.imread(sampleImgPath)
 
-    # img = get_crowdless_image(img)
+    img = get_crowdless_image(img)
 
     #dominantColorset = get_dominant_colorset(img, thresh=0.03, ignore_crowd = True, peak_num=3)
     #dominantColorset = get_dominant_colorset(img, thresh=0.02, ignore_crowd = False, peak_num=3)

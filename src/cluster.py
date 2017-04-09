@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import os
 import cv2
 
-from colors import get_crowdless_image
+import colors
 
 fileDir = os.path.dirname(os.path.realpath(__file__))
 vidDir = os.path.join(fileDir, '..', 'videos')
@@ -14,14 +14,48 @@ imgDir = os.path.join(fileDir, '..', 'images')
 
 sampleImgPath = os.path.join(imgDir, 'test.jpg')
 
-def centroidTest():
-    img = cv2.imread(sampleImgPath, 0)
+def getCentroids(img):
     ret, thresh = cv2.threshold(img, 127, 255, 0)
     contours, hierarchy = cv2.findContours(thresh, 1, 2)
+
+    centroids = []
+
+    for cnt in contours:
+        if 250 < cv2.contourArea(cnt) < 5000:
+            M = cv2.moments(cnt)
+            cx = int(M['m10']/M['m00'])
+            cy = int(M['m01']/M['m00'])
+            centroids.append((cx,cy))
+    return centroids
+
+
+def centroidTest():
+    img = cv2.imread(sampleImgPath)
+
+    img = colors.get_crowdless_image(img)
+    mask = colors.get_away_jersey_mask(img, (115, 190, 80), (125, 260, 260))
+
+    print getCentroids(mask)
+
+    """
+    ret, thresh = cv2.threshold(mask, 127, 255, 0)
+    contours, hierarchy = cv2.findContours(thresh, 1, 2)
+
+    for cnt in contours:
+        if 50 < cv2.contourArea(cnt) < 5000:
+            M = cv2.moments(cnt)
+            cx = int(M['m10']/M['m00'])
+            cy = int(M['m01']/M['m00'])
+            cv2.circle(img, (cx, cy), 10, (0, 255, 255))
+            #cv2.drawContours(img, [cnt], 0, (0,255,255), -1)
 
     cnt = contours[0]
     M = cv2.moments(cnt)
     print M
+    """
+
+    cv2.imshow('img', img)
+    cv2.waitKey(0)
 
 def blobTest():
     img = cv2.imread(sampleImgPath)
@@ -88,4 +122,5 @@ def clusterTest():
 
 if __name__ == "__main__":
     centroidTest()
+
 

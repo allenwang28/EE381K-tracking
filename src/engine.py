@@ -11,11 +11,12 @@ import frame_object as fo
 fileDir = os.path.dirname(os.path.realpath(__file__))
 vidDir = os.path.join(fileDir, '..', 'videos')
 
-defaultVidPath = os.path.join(vidDir, 'housas-1.mp4')
+#defaultVidPath = os.path.join(vidDir, 'housas-1.mp4')
+defaultVidPath = os.path.join(vidDir, 'gswokc-1.mp4')
 
 # --------- CONSTANTS
-GSW_JERSEY_UPPER = (115, 190, 80)
-GSW_JERSEY_LOWER = (125, 260, 260)
+GSW_JERSEY_LOWER = (115, 190, 80)
+GSW_JERSEY_UPPER = (125, 260, 260)
 
 def main(args):
     cap = cv2.VideoCapture(args.vid)
@@ -40,7 +41,8 @@ def main(args):
         # Operations goes here
 
         try:
-            frameObject = fo.FrameObject(img, currentFrame, args.vid)
+            frameObject = fo.FrameObject(img, currentFrame, args.vid, (GSW_JERSEY_LOWER, GSW_JERSEY_UPPER))
+            frameObject.show_away_player_coordinates()
             #frameObject.show_lines()
             #frameObject.show_points()
             raw_input()
@@ -51,7 +53,7 @@ def main(args):
         currentFrame += 1
 
         # Display things here
-        cv2.imshow('frame', img)
+        #cv2.imshow('frame', img)
 
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
