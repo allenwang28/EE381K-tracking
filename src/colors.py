@@ -9,7 +9,7 @@ from collections import deque
 # Constants -------------------------------------
 
 #CROWD_TOP_HEIGHT_FRACTION = .375;
-CROWD_TOP_HEIGHT_FRACTION = .35;
+CROWD_TOP_HEIGHT_FRACTION = .31;
 CROWD_BOTTOM_HEIGHT_FRACTION = .2;
 BGR_BLACK = (0,0,0)
 BGR_RED = (0, 0, 255)
@@ -28,30 +28,30 @@ def remap_from_crowdless_coords(original_img, coords):
 def get_crowdless_image(img):
     return img[int(CROWD_TOP_HEIGHT_FRACTION*img.shape[0]) : int(-CROWD_BOTTOM_HEIGHT_FRACTION*img.shape[0])]
 
-def get_jersey_mask(_bgr_img, lower, upper, binary_gray=True):
-    img = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2YCR_CB)
-    for row in xrange(img.shape[0]):
-        for col in xrange(img.shape[1]):
-            idx = (row, col)
-            _, cr, cb = img[idx]
-            if (cr, cb) not in lower:
-                img[idx] = YCBCR_BLACK
-            elif binary_gray:
-                img[idx] = YCBCR_WHITE
-
-    return ycbcr_to_gray(img) if binary_gray else img
-
 
 """
+def get_jersey_mask(_bgr_img, lower, upper, binary_gray=True):
+    img_ycrcb = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2YCR_CB)
+    lower = (0, lower[0], lower[1])
+    upper = (255, upper[0], upper[1])
+    img_ycrcb = cv2.inRange(img_ycrcb, lower, upper)
+
+    element = np.ones((5,5)).astype(np.uint8)
+    img_ycrcb = cv2.erode(img_ycrcb, element)
+    img_ycrcb = cv2.dilate(img_ycrcb, element)
+    return img_ycrcb
+"""
+
 def get_jersey_mask(_bgr_img, lower, upper):
     img_hsv = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2HSV)
     img_hsv = cv2.inRange(img_hsv, lower, upper)
 
+
+    # Morphology
     element = np.ones((5,5)).astype(np.uint8)
     img_hsv = cv2.erode(img_hsv, element)
     img_hsv = cv2.dilate(img_hsv, element)
     return img_hsv
-"""
 
 def create_court_mask(_bgr_img, dominant_colorset, binary_gray=False):
     img = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2YCR_CB)
@@ -259,14 +259,13 @@ if __name__ == '__main__':
     # color2 = (20, 255, 255)
 
     # GSW jerseys
-    color1 = (115, 190, 80)
-    color2 = (125, 260, 260)
+    lower = (115, 190, 80)
+    upper = (125, 260, 260)
 
-    color = (142, 142)
 
 
     # mask = get_jersey_mask(imgCpy, color1, color2)
-    mask = get_home_jersey_mask(imgCpy)
+    mask = get_jersey_mask(imgCpy, lower, upper)
 
     # grayMask = create_court_mask(imgCpy, dominantColorset, True)
 

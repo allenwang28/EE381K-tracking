@@ -29,6 +29,9 @@ class FrameObject():
     _baseline = None
     _freethrowline = None
     _close_paintline = None
+    # Trackers
+    _trackers = None
+
     # Booleans
     _sideline_detected = True
     _baseline_detected = True
@@ -41,8 +44,8 @@ class FrameObject():
     _close_paint_freethrow = None # Int btw close paintline and freethrow line
     _sideline_freethrow = None # Int btw far sideline and freethrow line
 
-    _away_player_coordinates = None
-    _home_player_coordinates = None
+    _away_mask_centroids = None
+    _home_mask_centroids = None
 
     def __init__(self, img, frame_num, video_title, away_colors, home_colors):
         assert img is not None
@@ -77,7 +80,6 @@ class FrameObject():
             self._gray_flooded2 = \
                 colors.get_double_flooded_mask(self.get_gray_mask())
         return self._gray_flooded2.copy()
-
 
     def get_sideline(self):
         if self._sideline is None:
@@ -133,6 +135,7 @@ class FrameObject():
         if self._away_mask is None:
             crowdlessImg = colors.get_crowdless_image(self.get_bgr_img())
             self._away_mask = colors.get_jersey_mask(crowdlessImg, self._away_colors[0], self._away_colors[1])
+            self._away_mask = cluster.clusterSegmentedImage(self._away_mask)
         return self._away_mask
 
 
@@ -140,34 +143,32 @@ class FrameObject():
         if self._home_mask is None:
             crowdlessImg = colors.get_crowdless_image(self.get_bgr_img())
             self._home_mask = colors.get_jersey_mask(crowdlessImg, self._home_colors[0], self._home_colors[1])
+            self._home_mask = cluster.clusterSegmentedImage(self._home_mask)
         return self._home_mask
 
 
-    def get_away_player_coordinates(self):
-        if self._away_player_coordinates is None:
-            self._away_player_coordinates = cluster.getCentroids(self.get_away_jersey_mask())
-            self._away_player_coordinates = colors.remap_from_crowdless_coords(self.get_bgr_img(), self._away_player_coordinates)
-        return self._away_player_coordinates
+    def get_away_mask_centroids(self):
+        if self._away_mask_centroids is None:
+            self._away_mask_centroids = cluster.getCentroids(self.get_away_jersey_mask())
+            self._away_mask_centroids = colors.remap_from_crowdless_coords(self.get_bgr_img(), self._away_mask_centroids)
+        return self._away_mask_centroids
 
-    def show_away_player_coordinates(self):
-        coordinates = self.get_away_player_coordinates()
+    def show_away_mask_centroids(self):
+        coordinates = self.get_away_mask_centroids()
         circleImg = self.get_bgr_img()
-        print coordinates
         for (x,y) in coordinates:
             circs = cv2.circle(circleImg, (x,y), 5, (255, 255, 255), -1)
-            print x
-            print y
         cv2.imshow('away players', circleImg)
 
 
-    def get_home_player_coordinates(self):
-        if self._home_player_coordinates is None:
-            self._home_player_coordinates = cluster.getCentroids(self.get_home_jersey_mask())
-            self._home_player_coordinates = colors.remap_from_crowdless_coords(self.get_bgr_img(), self._home_player_coordinates)
-        return self._home_player_coordinates
+    def get_home_mask_centroids(self):
+        if self._home_mask_centroids is None:
+            self._home_mask_centroids = cluster.getCentroids(self.get_home_jersey_mask())
+            self._home_mask_centroids = colors.remap_from_crowdless_coords(self.get_bgr_img(), self._home_mask_centroids)
+        return self._home_mask_centroids
 
-    def show_home_player_coordinates(self):
-        coordinates = self.get_home_player_coordinates()
+    def show_home_mask_centroids(self):
+        coordinates = self.get_home_mask_centroids()
         circleImg = self.get_bgr_img()
         print coordinates
         for (x,y) in coordinates:
@@ -197,6 +198,14 @@ class FrameObject():
         hough.put_points_on_img(img, points)
         cv2.imshow('points', img)
 
+    def show_away_jersey_mask(self):
+        cv2.imshow('away jersey mask', self.get_away_jersey_mask())
+
+    def show_home_jersey_mask(self):
+        cv2.imshow('home jersey mask', self.get_home_jersey_mask())
+
+    def show(self):
+        cv2.imshow('frame', self.get_bgr_img())
 
     def freethrowline_detected(self):
         return self._freethrowline_detected
@@ -267,7 +276,7 @@ if __name__ == '__main__':
     
     fo = FrameObject(img, 0, '', (GSW_JERSEY_UPPER, GSW_JERSEY_LOWER))
 
-    fo.show_away_player_coordinates()
+    fo.show_away_mask_centroids()
 
     cv2.waitKey(0)
 
