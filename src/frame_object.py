@@ -83,15 +83,12 @@ class FrameObject():
     def getSideline(self):
         if self._sideline is None:
             lines = tld.find_top_boundary(self.getGrayMask())
-            print("Lines----")
-            print type(lines)
-            print lines
             # img = colors.gray_to_bgr(self._grayMask.copy())
             # hough.put_lines_on_img(img, lines)
             # cv2.imwrite('images/6584_toplines.jpg', img)
             if len(lines) < 2:
                 _baselineDetected = False
-                print "Baseline not detected"
+                raise Exception("Baseline not detected")
             self._sideline = lines[0]
             self._baseline = lines[1]
         return self._sideline
@@ -152,62 +149,17 @@ class FrameObject():
             self._awayMaskCentroids = colors.remap_from_crowdless_coords(self.getBgrImg(), self._awayMaskCentroids)
         return self._awayMaskCentroids
 
-    def showAwayMaskCentroids(self):
-        coordinates = self.getAwayMaskCentroids()
-        circleImg = self.getBgrImg()
-        for (x,y) in coordinates:
-            circs = cv2.circle(circleImg, (x,y), 5, (255, 255, 255), -1)
-        cv2.imshow('away players', circleImg)
-
-
     def getHomeMaskCentroids(self):
         if self._homeMaskCentroids is None:
             self._homeMaskCentroids = cluster.getCentroids(self.getHomeJerseyMask())
             self._homeMaskCentroids = colors.remap_from_crowdless_coords(self.getBgrImg(), self._homeMaskCentroids)
         return self._homeMaskCentroids
 
-    def showHomeMaskCentroids(self):
-        coordinates = self.getHomeMaskCentroids()
-        circleImg = self.getBgrImg()
-        for (x,y) in coordinates:
-            circs = cv2.circle(circleImg, (x,y), 5, (255, 255, 255), -1)
-        cv2.imshow('home players', circleImg)
-
     def getNumAwayMaskCentroids(self):
         return len(self.getAwayMaskCentroids())
 
     def getNumHomeMaskCentroids(self):
         return len(self.getHomeMaskCentroids())
-
-    def showLines(self):
-        lines = [self.getFreethrowline(), self.getClosepaintline(),
-            self.getSideline(), self.getBaseline()]
-        if not self.allLinesDetected():
-            raise Exception("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
-        img = colors.gray_to_bgr(self.getGrayFlooded2())
-        hough.put_lines_on_img(img, lines)
-        cv2.imshow('lines', img)
-
-    def showPoints(self):
-        lines = [self.getFreethrowline(), self.getClosepaintline(),
-            self.getSideline(), self.getBaseline()]
-        if not self.allLinesDetected():
-            raise Exception("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
-        img = self.getBgrImg()
-        hough.put_lines_on_img(img, lines)
-        points = self.getQuadranglePoints()
-        print (points)
-        hough.put_points_on_img(img, points)
-        cv2.imshow('points', img)
-
-    def showAwayJerseyMask(self):
-        cv2.imshow('away jersey mask', self.getAwayJerseyMask())
-
-    def showHomeJerseyMask(self):
-        cv2.imshow('home jersey mask', self.getHomeJerseyMask())
-
-    def show(self):
-        cv2.imshow('frame', self.getBgrImg())
 
     def freethrowlineDetected(self):
         return self._freethrowlineDetected
@@ -256,6 +208,74 @@ class FrameObject():
         self.getAwayMaskCentroids()
         self.getHomeMaskCentroids()
 
+    def drawLines(self, img=_bgrImg):
+        lines = [self.getFreethrowline(), self.getClosepaintline(),
+            self.getSideline(), self.getBaseline()]
+        if not self.allLinesDetected():
+            raise Exception("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
+        #img = colors.gray_to_bgr(self.getGrayFlooded2())
+        hough.put_lines_on_img(img, lines)
+        return img
+
+    def drawPoints(self, img=_bgrImg):
+        lines = [self.getFreethrowline(), self.getClosepaintline(),
+            self.getSideline(), self.getBaseline()]
+        if not self.allLinesDetected():
+            raise Exception("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
+        hough.put_lines_on_img(img, lines)
+        points = self.getQuadranglePoints()
+        hough.put_points_on_img(img, points)
+        return img
+
+    def drawAwayMaskCentroids(self, img=_bgrImg):
+        coordinates = self.getAwayMaskCentroids()
+
+        circleColor = colors.hsv_to_bgr_color(self._homeColors[1])
+        for (x,y) in coordinates:
+            circs = cv2.circle(img, (x,y), 5, circleColor, -1)
+        return img
+
+    def drawHomeMaskCentroids(self, img=_bgrImg):
+        coordinates = self.getHomeMaskCentroids()
+        circleColor = colors.hsv_to_bgr_color(self._awayColors[1])
+        for (x,y) in coordinates:
+            circs = cv2.circle(img, (x,y), 5, circleColor, -1)
+        return img
+
+    def showFrame(self):
+        cv2.imshow('frame', self.getBgrImg())
+
+    def showLines(self):
+        cv2.imshow('lines', self.drawLines())
+
+    def showPoints(self):
+        cv2.imshow('points', self.drawPoints())
+
+    def showAwayMaskCentroids(self):
+        cv2.imshow('away players', self.drawAwayMaskCentroids())
+
+    def showHomeMaskCentroids(self):
+        cv2.imshow('home players', self.drawHomeMaskCentroids())
+
+    def showHomeJerseyMask(self):
+        cv2.imshow('home jersey mask', self.getHomeJerseyMask())
+
+    def showAwayJerseyMask(self):
+        cv2.imshow('away jersey mask', self.getAwayJerseyMask())
+
+    # This function shows the mask centroids and the 
+    # court lines
+    def show(self):
+        try:
+            frame = self.getBgrImg()
+            frame = self.drawHomeMaskCentroids(img=frame)
+            frame = self.drawAwayMaskCentroids(img=frame)
+            frame  = self.drawPoints(img=frame)
+        except Exception as e:
+            print e
+            pass
+        cv2.imshow('frame-info', frame)
+
 
 def testlines(img_obj, save_filename):
     lines = [img_obj.getFreethrowline(), img_obj.getClosepaintline(),
@@ -271,7 +291,6 @@ def testpoints(img_obj, save_filename):
     img = img_obj.getBgrImg()
     hough.put_lines_on_img(img, lines)
     points = img_obj.getQuadranglePoints()
-    print (points)
     hough.put_points_on_img(img, points)
     cv2.imwrite(save_filename, img)
 

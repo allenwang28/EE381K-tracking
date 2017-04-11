@@ -6,6 +6,7 @@ import numpy as np
 import cv2
 
 import frame_object as fo
+import colors
 
 
 fileDir = os.path.dirname(os.path.realpath(__file__))
@@ -97,12 +98,14 @@ class Engine:
 
                 if self._verbose:
                     print "Processing frame {}/{}".format(frameNum, self._capLength)
-
                 try:
                     frameObject = fo.FrameObject(img, frameNum, self._video, 
                             self.getAwayColors(), self.getHomeColors())
                     frameObject.generate()
                     self._frameObjects.append(frameObject)
+                    if self._verbose:
+                        frameObject.show()
+
                 except Exception as e:
                     if self._verbose:
                         print (e)
@@ -133,24 +136,21 @@ def main(args):
 
         try:
             #frameObject = fo.FrameObject(img, currentFrame, args.vid, GSW_AWAY, OKC_HOME)
-            frameObject = fo.FrameObject(img, currentFrame, args.vid, HOU_AWAY, SAS_HOME)
-            frameObject.show_home_jersey_mask()
-            frameObject.show_home_mask_centroids()
+            frameObject = fo.FrameObject(img, currentFrame, args.vid, colors.HOU_AWAY, colors.SAS_HOME)
             #frameObject.show_away_mask_centroids()
             #frameObject.show_away_jersey_mask()
-            #frameObject.show()
+            frameObject.show()
 
             #frameObject.show_home_player_coordinates()
 
             #frameObject.show_lines()
             #frameObject.show_points()
-            raw_input()
+            #raw_input()
 
 
         except Exception as inst:
             print(inst)
             print "Continuing"
-
         currentFrame += 1
 
         # Display things here

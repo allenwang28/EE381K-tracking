@@ -16,7 +16,6 @@ OKC_HOME_LOWER = (125, 25, 178)
 OKC_HOME_UPPER = (180, 75, 260)
 OKC_HOME = (OKC_HOME_LOWER, OKC_HOME_UPPER)
 
-
 HOU_AWAY_LOWER = (170, 85, 100)
 HOU_AWAY_UPPER = (180, 255, 255)
 HOU_AWAY = (HOU_AWAY_LOWER, HOU_AWAY_UPPER)
@@ -24,8 +23,6 @@ HOU_AWAY = (HOU_AWAY_LOWER, HOU_AWAY_UPPER)
 SAS_HOME_LOWER = (120, 10, 168)
 SAS_HOME_UPPER = (190, 30, 260)
 SAS_HOME = (SAS_HOME_LOWER, SAS_HOME_UPPER)
-
-
 
 #CROWD_TOP_HEIGHT_FRACTION = .375;
 CROWD_TOP_HEIGHT_FRACTION = .31;
@@ -46,20 +43,6 @@ def remap_from_crowdless_coords(original_img, coords):
 
 def get_crowdless_image(img):
     return img[int(CROWD_TOP_HEIGHT_FRACTION*img.shape[0]) : int(-CROWD_BOTTOM_HEIGHT_FRACTION*img.shape[0])]
-
-
-"""
-def get_jersey_mask(_bgr_img, lower, upper, binary_gray=True):
-    img_ycrcb = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2YCR_CB)
-    lower = (0, lower[0], lower[1])
-    upper = (255, upper[0], upper[1])
-    img_ycrcb = cv2.inRange(img_ycrcb, lower, upper)
-
-    element = np.ones((5,5)).astype(np.uint8)
-    img_ycrcb = cv2.erode(img_ycrcb, element)
-    img_ycrcb = cv2.dilate(img_ycrcb, element)
-    return img_ycrcb
-"""
 
 def get_jersey_mask(_bgr_img, lower, upper):
     img_hsv = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2HSV)
@@ -237,11 +220,9 @@ def ycbcr_to_binary(ycbcr_img):
     img = ycbcr_img.copy()
     return ycbcr_to_gray(img) > 128
 
-
 def binary_to_gray(binary_img):
     img = binary_img.copy()
     return img * 255;
-
 
 def gray_to_bgr(gray_img):
     img = gray_img.copy()
@@ -250,6 +231,14 @@ def gray_to_bgr(gray_img):
 def show_binary(binary):
     plt.imshow(binary)
     plt.show()
+
+# hsv is a set
+# This is a hacky way to turn hsv set into an bgr set
+def hsv_to_bgr_color(hsv):
+    c = np.uint8([[list(hsv)]])
+    c = cv2.cvtColor(c, cv2.COLOR_HSV2BGR)
+    return (int(c[0][0][0]), int(c[0][0][1]), int(c[0][0][2]))
+
 
 if __name__ == '__main__':
     import os
