@@ -76,7 +76,7 @@ def getCentroids(img):
     centroids = []
 
     for cnt in contours:
-        if 500 < cv2.contourArea(cnt) < 10000:
+        if 300 < cv2.contourArea(cnt) < 10000:
             M = cv2.moments(cnt)
             cx = int(M['m10']/M['m00'])
             cy = int(M['m01']/M['m00'])

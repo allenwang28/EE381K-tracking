@@ -13,251 +13,264 @@ import cluster
 
 class FrameObject():
     # Variables
-    _frame_num = None
-    _video_title = None
+    _frameNum = None
+    _videoTitle = None
     # Images
-    _bgr_img = None
-    _gray_mask = None
-    _dominant_colorset = None
-    _gray_flooded2 = None
-    _away_colors = None
-    _away_mask = None
-    _home_colors = None
-    _home_mask = None
+    _bgrImg = None
+    _grayMask = None
+    _dominantColorset = None
+    _grayFlooded2 = None
+    _awayColors = None
+    _awayMask = None
+    _homeColors = None
+    _homeMask = None
     # Lines
     _sideline = None
     _baseline = None
     _freethrowline = None
-    _close_paintline = None
+    _closepaintline = None
     # Trackers
     _trackers = None
 
     # Booleans
-    _sideline_detected = True
-    _baseline_detected = True
-    _freethrowline_detected = True
-    _close_paintline_detected = True
+    _sidelineDetected = True
+    _baselineDetected = True
+    _freethrowlineDetected = True
+    _closepaintlineDetected = True
 
     # Points
-    _sideline_baseline = None # The far one in the corner
-    _close_paint_baseline = None # Intersection between close paintline and baseline
-    _close_paint_freethrow = None # Int btw close paintline and freethrow line
-    _sideline_freethrow = None # Int btw far sideline and freethrow line
+    _sidelineBaseline = None # The far one in the corner
+    _closepaintBaseline = None # Intersection between close paintline and baseline
+    _closepaintFreethrow = None # Int btw close paintline and freethrow line
+    _sidelineFreethrow = None # Int btw far sideline and freethrow line
 
-    _away_mask_centroids = None
-    _home_mask_centroids = None
+    _awayMaskCentroids = None
+    _homeMaskCentroids = None
 
-    def __init__(self, img, frame_num, video_title, away_colors, home_colors):
+    def __init__(self, img, frameNum, videoTitle, awayColors, homeColors):
         assert img is not None
-        self._bgr_img = img
-        self._frame_num = frame_num
-        self._video_title = video_title
-        self._away_colors = away_colors
-        self._home_colors = home_colors
+        self._bgrImg = img
+        self._frameNum = frameNum
+        self._videoTitle = videoTitle
+        self._awayColors = awayColors
+        self._homeColors = homeColors
 
     # Exported methods
-    def get_gray_mask(self):
-        if self._gray_mask is None:
-            d_c = self.get_dominant_colorset()
-            self._gray_mask = \
-                colors.create_court_mask(self.get_bgr_img(), d_c, True)
-        return self._gray_mask.copy()
+    def getGrayMask(self):
+        if self._grayMask is None:
+            d_c = self.getDominantColorset()
+            self._grayMask = \
+                colors.create_court_mask(self.getBgrImg(), d_c, True)
+        return self._grayMask.copy()
 
 
-    def get_bgr_img(self):
-        return self._bgr_img.copy()
+    def getBgrImg(self):
+        return self._bgrImg.copy()
 
 
-    def get_dominant_colorset(self):
-        if self._dominant_colorset is None:
-            self._dominant_colorset = colors.get_dominant_colorset(self.get_bgr_img())
-        # colors.show_hist(self._dominant_colorset)
-        return self._dominant_colorset.copy()
+    def getDominantColorset(self):
+        if self._dominantColorset is None:
+            self._dominantColorset = colors.get_dominant_colorset(self.getBgrImg())
+        return self._dominantColorset.copy()
 
 
-    def get_gray_flooded2(self):
-        if self._gray_flooded2 is None:
-            self._gray_flooded2 = \
-                colors.get_double_flooded_mask(self.get_gray_mask())
-        return self._gray_flooded2.copy()
+    def getGrayFlooded2(self):
+        if self._grayFlooded2 is None:
+            self._grayFlooded2 = \
+                colors.get_double_flooded_mask(self.getGrayMask())
+        return self._grayFlooded2.copy()
 
-    def get_sideline(self):
+    def getSideline(self):
         if self._sideline is None:
-            lines = tld.find_top_boundary(self.get_gray_mask())
+            lines = tld.find_top_boundary(self.getGrayMask())
             print("Lines----")
             print type(lines)
             print lines
-            # img = colors.gray_to_bgr(self._gray_mask.copy())
+            # img = colors.gray_to_bgr(self._grayMask.copy())
             # hough.put_lines_on_img(img, lines)
             # cv2.imwrite('images/6584_toplines.jpg', img)
             if len(lines) < 2:
-                _baseline_detected = False
+                _baselineDetected = False
                 print "Baseline not detected"
             self._sideline = lines[0]
             self._baseline = lines[1]
         return self._sideline
 
 
-    def get_baseline(self):
+    def getBaseline(self):
         if self._baseline is None:
-            _ = self.get_sideline()
+            _ = self.getSideline()
         return self._baseline
 
 
-    def get_freethrowline(self):
+    def getFreethrowline(self):
         if self._freethrowline is None:
-            lines = hough.get_lines_from_paint(self.get_gray_flooded2(),
-                self.get_sideline(), self.get_baseline(), verbose=True)
+            lines = hough.get_lines_from_paint(self.getGrayFlooded2(),
+                self.getSideline(), self.getBaseline(), verbose=True)
             if lines[0] is None:
-                self._freethrowline_detected = False
+                self._freethrowlineDetected = False
             if lines[1] is None:
-                self._close_paintline_detected = False
-            self._freethrowline, self._close_paintline = lines
+                self._closepaintlineDetected = False
+            self._freethrowline, self._closepaintline = lines
         return self._freethrowline
 
 
-    def get_close_paintline(self):
-        if self._close_paintline is None:
-            _ = self.get_freethrowline()
-        return self._close_paintline
+    def getClosepaintline(self):
+        if self._closepaintline is None:
+            _ = self.getFreethrowline()
+        return self._closepaintline
 
 
-    def get_quadrangle_points(self):
+    def getQuadranglePoints(self):
         pts = []
-        pts.append(get_intersection(self.get_sideline(), self.get_freethrowline()))
-        pts.append(get_intersection(self.get_sideline(), self.get_baseline()))
-        pts.append(get_intersection(self.get_close_paintline(), self.get_baseline()))
-        pts.append(get_intersection(self.get_close_paintline(), self.get_freethrowline()))
+        pts.append(get_intersection(self.getSideline(), self.getFreethrowline()))
+        pts.append(get_intersection(self.getSideline(), self.getBaseline()))
+        pts.append(get_intersection(self.getClosepaintline(), self.getBaseline()))
+        pts.append(get_intersection(self.getClosepaintline(), self.getFreethrowline()))
         return pts
 
 
-    def get_away_jersey_mask(self):
-        if self._away_mask is None:
-            crowdlessImg = colors.get_crowdless_image(self.get_bgr_img())
-            self._away_mask = colors.get_jersey_mask(crowdlessImg, self._away_colors[0], self._away_colors[1])
-            self._away_mask = cluster.clusterSegmentedImage(self._away_mask)
-        return self._away_mask
+    def getAwayJerseyMask(self):
+        if self._awayMask is None:
+            crowdlessImg = colors.get_crowdless_image(self.getBgrImg())
+            self._awayMask = colors.get_jersey_mask(crowdlessImg, self._awayColors[0], self._awayColors[1])
+            self._awayMask = cluster.clusterSegmentedImage(self._awayMask)
+        return self._awayMask
 
 
-    def get_home_jersey_mask(self):
-        if self._home_mask is None:
-            crowdlessImg = colors.get_crowdless_image(self.get_bgr_img())
-            self._home_mask = colors.get_jersey_mask(crowdlessImg, self._home_colors[0], self._home_colors[1])
-            self._home_mask = cluster.clusterSegmentedImage(self._home_mask)
-        return self._home_mask
+    def getHomeJerseyMask(self):
+        if self._homeMask is None:
+            crowdlessImg = colors.get_crowdless_image(self.getBgrImg())
+            self._homeMask = colors.get_jersey_mask(crowdlessImg, self._homeColors[0], self._homeColors[1])
+            self._homeMask = cluster.clusterSegmentedImage(self._homeMask)
+        return self._homeMask
 
 
-    def get_away_mask_centroids(self):
-        if self._away_mask_centroids is None:
-            self._away_mask_centroids = cluster.getCentroids(self.get_away_jersey_mask())
-            self._away_mask_centroids = colors.remap_from_crowdless_coords(self.get_bgr_img(), self._away_mask_centroids)
-        return self._away_mask_centroids
+    def getAwayMaskCentroids(self):
+        if self._awayMaskCentroids is None:
+            self._awayMaskCentroids = cluster.getCentroids(self.getAwayJerseyMask())
+            self._awayMaskCentroids = colors.remap_from_crowdless_coords(self.getBgrImg(), self._awayMaskCentroids)
+        return self._awayMaskCentroids
 
-    def show_away_mask_centroids(self):
-        coordinates = self.get_away_mask_centroids()
-        circleImg = self.get_bgr_img()
+    def showAwayMaskCentroids(self):
+        coordinates = self.getAwayMaskCentroids()
+        circleImg = self.getBgrImg()
         for (x,y) in coordinates:
             circs = cv2.circle(circleImg, (x,y), 5, (255, 255, 255), -1)
         cv2.imshow('away players', circleImg)
 
 
-    def get_home_mask_centroids(self):
-        if self._home_mask_centroids is None:
-            self._home_mask_centroids = cluster.getCentroids(self.get_home_jersey_mask())
-            self._home_mask_centroids = colors.remap_from_crowdless_coords(self.get_bgr_img(), self._home_mask_centroids)
-        return self._home_mask_centroids
+    def getHomeMaskCentroids(self):
+        if self._homeMaskCentroids is None:
+            self._homeMaskCentroids = cluster.getCentroids(self.getHomeJerseyMask())
+            self._homeMaskCentroids = colors.remap_from_crowdless_coords(self.getBgrImg(), self._homeMaskCentroids)
+        return self._homeMaskCentroids
 
-    def show_home_mask_centroids(self):
-        coordinates = self.get_home_mask_centroids()
-        circleImg = self.get_bgr_img()
-        print coordinates
+    def showHomeMaskCentroids(self):
+        coordinates = self.getHomeMaskCentroids()
+        circleImg = self.getBgrImg()
         for (x,y) in coordinates:
             circs = cv2.circle(circleImg, (x,y), 5, (255, 255, 255), -1)
-            print x
-            print y
         cv2.imshow('home players', circleImg)
 
-    def show_lines(self):
-        lines = [self.get_freethrowline(), self.get_close_paintline(),
-            self.get_sideline(), self.get_baseline()]
-        if not self.all_lines_detected():
-            raise Exception("Not all lines were detected. Undetected: {}".format(self.get_undetected_lines()))
-        img = colors.gray_to_bgr(self.get_gray_flooded2())
+    def getNumAwayMaskCentroids(self):
+        return len(self.getAwayMaskCentroids())
+
+    def getNumHomeMaskCentroids(self):
+        return len(self.getHomeMaskCentroids())
+
+    def showLines(self):
+        lines = [self.getFreethrowline(), self.getClosepaintline(),
+            self.getSideline(), self.getBaseline()]
+        if not self.allLinesDetected():
+            raise Exception("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
+        img = colors.gray_to_bgr(self.getGrayFlooded2())
         hough.put_lines_on_img(img, lines)
         cv2.imshow('lines', img)
 
-    def show_points(self):
-        lines = [self.get_freethrowline(), self.get_close_paintline(),
-            self.get_sideline(), self.get_baseline()]
-        if not self.all_lines_detected():
-            raise Exception("Not all lines were detected. Undetected: {}".format(self.get_undetected_lines()))
-        img = self.get_bgr_img()
+    def showPoints(self):
+        lines = [self.getFreethrowline(), self.getClosepaintline(),
+            self.getSideline(), self.getBaseline()]
+        if not self.allLinesDetected():
+            raise Exception("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
+        img = self.getBgrImg()
         hough.put_lines_on_img(img, lines)
-        points = self.get_quadrangle_points()
+        points = self.getQuadranglePoints()
         print (points)
         hough.put_points_on_img(img, points)
         cv2.imshow('points', img)
 
-    def show_away_jersey_mask(self):
-        cv2.imshow('away jersey mask', self.get_away_jersey_mask())
+    def showAwayJerseyMask(self):
+        cv2.imshow('away jersey mask', self.getAwayJerseyMask())
 
-    def show_home_jersey_mask(self):
-        cv2.imshow('home jersey mask', self.get_home_jersey_mask())
+    def showHomeJerseyMask(self):
+        cv2.imshow('home jersey mask', self.getHomeJerseyMask())
 
     def show(self):
-        cv2.imshow('frame', self.get_bgr_img())
+        cv2.imshow('frame', self.getBgrImg())
 
-    def freethrowline_detected(self):
-        return self._freethrowline_detected
+    def freethrowlineDetected(self):
+        return self._freethrowlineDetected
 
-    def baseline_detected(self):
-        return self._baseline_detected
+    def baselineDetected(self):
+        return self._baselineDetected
 
-    def sideline_detected(self):
-        return self._sideline_detected
+    def sidelineDetected(self):
+        return self._sidelineDetected
 
-    def close_paintline_detected(self):
-        return self._close_paintline_detected
+    def closepaintlineDetected(self):
+        return self._closepaintlineDetected
 
-    def all_lines_detected(self):
-        return self._freethrowline_detected and \
-               self._baseline_detected and \
-               self._close_paintline_detected and \
-               self._sideline_detected
+    def allLinesDetected(self):
+        return self._freethrowlineDetected and \
+               self._baselineDetected and \
+               self._closepaintlineDetected and \
+               self._sidelineDetected
 
-    def get_frame_number(self):
-        return self._frame_num
+    def getFrameNumber(self):
+        return self._frameNum
 
-    def get_video_title(self):
-        return self._video_title
+    def getVideoTitle(self):
+        return self._videoTitle
 
-    def get_undetected_lines(self):
+    def getUndetectedLines(self):
         undetected_lines = ""
-        if not self._freethrowline_detected:
+        if not self._freethrowlineDetected:
             undetected_lines += "free throw\n"
-        if not self._baseline_detected:
+        if not self._baselineDetected:
             undetected_lines += "baseline\n"
-        if not self._close_paintline_detected:
+        if not self._closepaintlineDetected:
             undetected_lines += "paintline\n"
-        if not self._sideline_detected:
+        if not self._sidelineDetected:
             undetected_lines += "sideline\n"
         return undetected_lines
 
+    def isAnchorPoint(self):
+        return self.getNumAwayMaskCentroids() == 5 and \
+               self.getNumHomeMaskCentroids() == 5 and \
+               self.allLinesDetected()
+
+    # This function should get rid of all of the "Nones"
+    def generate(self):
+        self.getQuadranglePoints()
+        self.getAwayMaskCentroids()
+        self.getHomeMaskCentroids()
+
 
 def testlines(img_obj, save_filename):
-    lines = [img_obj.get_freethrowline(), img_obj.get_close_paintline(),
-        img_obj.get_sideline(), img_obj.get_baseline()]
-    img = colors.gray_to_bgr(img_obj.get_gray_flooded2())
+    lines = [img_obj.getFreethrowline(), img_obj.getClosepaintline(),
+        img_obj.getSideline(), img_obj.getBaseline()]
+    img = colors.gray_to_bgr(img_obj.getGrayFlooded2())
     hough.put_lines_on_img(img, lines)
     cv2.imshow('lines', img)
 
 
 def testpoints(img_obj, save_filename):
-    lines = [img_obj.get_freethrowline(), img_obj.get_close_paintline(),
-        img_obj.get_sideline(), img_obj.get_baseline()]
-    img = img_obj.get_bgr_img()
+    lines = [img_obj.getFreethrowline(), img_obj.getClosepaintline(),
+        img_obj.getSideline(), img_obj.getBaseline()]
+    img = img_obj.getBgrImg()
     hough.put_lines_on_img(img, lines)
-    points = img_obj.get_quadrangle_points()
+    points = img_obj.getQuadranglePoints()
     print (points)
     hough.put_points_on_img(img, points)
     cv2.imwrite(save_filename, img)
@@ -276,7 +289,7 @@ if __name__ == '__main__':
     
     fo = FrameObject(img, 0, '', (GSW_JERSEY_UPPER, GSW_JERSEY_LOWER))
 
-    fo.show_away_mask_centroids()
+    fo.showAwayMaskCentroids()
 
     cv2.waitKey(0)
 

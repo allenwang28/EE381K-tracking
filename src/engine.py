@@ -11,34 +11,103 @@ import frame_object as fo
 fileDir = os.path.dirname(os.path.realpath(__file__))
 vidDir = os.path.join(fileDir, '..', 'videos')
 
-#defaultVidPath = os.path.join(vidDir, 'housas-1.mp4')
-defaultVidPath = os.path.join(vidDir, 'gswokc-1.mp4')
+defaultVidPath = os.path.join(vidDir, 'housas-1.mp4')
+#defaultVidPath = os.path.join(vidDir, 'gswokc-1.mp4')
 
-# --------- CONSTANTS
-# HSV
-#GSW_AWAY_LOWER = (115, 190, 50)
-#GSW_AWAY_UPPER = (125, 260, 260)
-GSW_AWAY_LOWER = (115, 190, 80)
-GSW_AWAY_UPPER = (135, 255, 150)
-GSW_AWAY = (GSW_AWAY_LOWER, GSW_AWAY_UPPER)
+# NOTE - this is required because we only found the 
+# ranges for a limited number of teams
+ACCEPTED_AWAY_TEAM_KEYS = [
+    'GSW',
+    'HOU'
+]
 
-#OKC_HOME_LOWER = (125, 50, 140)
-#OKC_HOME_UPPER = (145, 255, 255)
-OKC_HOME_LOWER = (125, 25, 178)
-OKC_HOME_UPPER = (180, 75, 260)
-OKC_HOME = (OKC_HOME_LOWER, OKC_HOME_UPPER)
+ACCEPTED_HOME_TEAMS = [
+    'OKC',
+    'SAS',
+]
 
-"""
-# YCBCR
-GSW_AWAY_LOWER = (177, 118)
-GSW_AWAY_UPPER = (180, 118)
-GSW_AWAY = (GSW_AWAY_LOWER, GSW_AWAY_UPPER)
+        
+AWAY_TEAM_COLOR_DICT = {
+    'GSW': colors.GSW_AWAY,
+    'HOU': colors.HOU_AWAY,
+}
+
+HOME_TEAM_COLOR_DICT = {
+     'OKC': colors.OKC_HOME,
+     'SAS': colors.SAS_HOME,
+}
 
 
-OKC_HOME_LOWER = (140, 142)
-OKC_HOME_UPPER = (142, 142)
-OKC_HOME = (OKC_HOME_LOWER, OKC_HOME_UPPER)
-"""
+class Engine:
+    # Video/opencv related variables
+    _video = None # This is a path
+    _cap = None
+    _capLength = None
+
+    # Lists
+    _frameObjects = None
+    _trackers = None
+
+    # Booleans
+    _verbose = True
+
+    # Game specific variables
+    _awayTeam = None
+    _homeTeam = None
+    _awayColors = None
+    _homeColors = None
+
+
+    def __init__(self, video, awayTeam, homeTeam, verbose = True):
+        self._video = video
+        if awayTeam not in ACCEPTED_AWAY_TEAM_KEYS:
+            raise Exception("Invalid away team provided: {}".format(awayTeam))
+        if homeTeam not in ACCEPTED_HOME_TEAM_KEYS:
+            raise Exception("Invalid home team provided: {}".format(homeTeam))
+        self._awayTeam = awayTeam
+        self._homeTeam = homeTeam
+        self._verbose = verbose
+        self._cap = cv2.VideoCapture(_video)
+        self._capLength = int(self._cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
+        if verbose:
+            print(("#===== Opening {} =====#".format(video)))
+            print(("Successful?: {}".format(str(self._cap.isOpened()))))
+            print(("Frame width: {}".format(self._cap.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))))
+            print(("Frame height: {}".format(self._cap.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))))
+            print(("FPS: {}".format(str(self._cap.get(cv2.cv.CV_CAP_PROP_FPS)))))
+            print(("Frame count: {}".format(self._capLength)))
+
+    def getAwayColors(self):
+        if self._awayColors is None:
+            self._awayColors = away_TEAM_COLOR_DICT[self._awayTeam]
+        return self._awayColors
+
+    def getHomeColors(self):
+        if self._homeColors is None:
+            self._homeColors = HOME_TEAM_COLOR_DICT[self._homeTeam]
+        return self._homeColors
+
+    def getFrameObjects(self):
+        # TODO - save all of this into a pickle file and load
+        if self._frameObjects is None:
+            self._frameObjects = []
+            frameNum = 0
+            while(frameNum < self._capLength):
+                ret, img = self._cap.read()
+
+                if self._verbose:
+                    print "Processing frame {}/{}".format(frameNum, self._capLength)
+
+                try:
+                    frameObject = fo.FrameObject(img, frameNum, self._video, 
+                            self.getAwayColors(), self.getHomeColors())
+                    frameObject.generate()
+                    self._frameObjects.append(frameObject)
+                except Exception as e:
+                    if self._verbose:
+                        print (e)
+        return self._frameObjects
+
 
 def main(args):
     cap = cv2.VideoCapture(args.vid)
@@ -63,7 +132,8 @@ def main(args):
         # Operations goes here
 
         try:
-            frameObject = fo.FrameObject(img, currentFrame, args.vid, GSW_AWAY, OKC_HOME)
+            #frameObject = fo.FrameObject(img, currentFrame, args.vid, GSW_AWAY, OKC_HOME)
+            frameObject = fo.FrameObject(img, currentFrame, args.vid, HOU_AWAY, SAS_HOME)
             frameObject.show_home_jersey_mask()
             frameObject.show_home_mask_centroids()
             #frameObject.show_away_mask_centroids()
@@ -74,7 +144,7 @@ def main(args):
 
             #frameObject.show_lines()
             #frameObject.show_points()
-            #raw_input()
+            raw_input()
 
 
         except Exception as inst:
