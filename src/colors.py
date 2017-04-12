@@ -28,6 +28,11 @@ SAS_HOME = (SAS_HOME_LOWER, SAS_HOME_UPPER)
 #CROWD_TOP_HEIGHT_FRACTION = .375;
 CROWD_TOP_HEIGHT_FRACTION = .31;
 CROWD_BOTTOM_HEIGHT_FRACTION = .2;
+
+
+MID_TOP_HEIGHT_FRACTION = .5;
+MID_BOTTOM_HEIGHT_FRACTION = .4;
+
 BGR_BLACK = (0,0,0)
 BGR_RED = (0, 0, 255)
 BGR_BLUE = (255, 0, 0)
@@ -44,6 +49,35 @@ def remap_from_crowdless_coords(original_img, coords):
 
 def get_crowdless_image(img):
     return img[int(CROWD_TOP_HEIGHT_FRACTION*img.shape[0]) : int(-CROWD_BOTTOM_HEIGHT_FRACTION*img.shape[0])]
+
+# NOTE - doesn't work
+def get_middle_court(img):
+    return img[int(MID_TOP_HEIGHT_FRACTION*img.shape[0]) : int(-MID_BOTTOM_HEIGHT_FRACTION*img.shape[0])]
+
+# NOTE - doesn't work
+def get_jersey1_colors(_bgr_img, thresh=0.02, peak_num=2):
+    img = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2YCR_CB)
+
+    get_middle_court(_bgr_img)
+
+    hist = cv2.calcHist([img], [1,2], None, [256,256], [0,256, 0,256])
+
+    subtracted_hist = hist.copy()
+    connected_hist = None
+
+    peak_flat_idx = np.argmax(subtracted_hist)
+    peak_idx = np.unravel_index(peak_flat_idx, subtracted_hist.shape)
+    peak_val = hist[peak_idx]
+    connected_hist, sumX, subtracted_hist = get_connected_hist(subtracted_hist, peak_idx, 0.02)
+
+
+    for _ in xrange(peak_num):
+        peak_flat_idx = np.argmax(subtracted_hist)
+        peak_idx = np.unravel_index(peak_flat_idx, subtracted_hist.shape)
+        peak_val = hist[peak_idx]
+        connected_hist, sumX, subtracted_hist = get_connected_hist(subtracted_hist, peak_idx, thresh)
+
+    return connected_hist
 
 def get_jersey_mask(_bgr_img, lower, upper):
     img_hsv = cv2.cvtColor(_bgr_img, cv2.COLOR_BGR2HSV)
@@ -250,22 +284,15 @@ if __name__ == '__main__':
 
     sampleImgPath = os.path.join(imgDir, 'test.jpg')
 
-
-
     img = cv2.imread(sampleImgPath)
 
+    """
     img = get_crowdless_image(img)
 
     #dominantColorset = get_dominant_colorset(img, thresh=0.03, ignore_crowd = True, peak_num=3)
     #dominantColorset = get_dominant_colorset(img, thresh=0.02, ignore_crowd = False, peak_num=3)
 
     imgCpy = img.copy()
-
-#    color1 = (235,82,49)
-#    color2 = (229,94,36)
-
-    # color1 = (0, 100, 100)
-    # color2 = (20, 255, 255)
 
     # GSW jerseys
     lower = (115, 190, 80)
@@ -279,9 +306,27 @@ if __name__ == '__main__':
     # grayMask = create_court_mask(imgCpy, dominantColorset, True)
 
     # cv2.imshow('mask', grayMask)
+    """
+    """
+    dominantColorset1 = get_dominant_colorset(img, thresh=0.02, ignore_crowd = True, peak_num=1)
+    dominantColorset2 = get_dominant_colorset(img, thresh=0.1, ignore_crowd = True, peak_num=2)
+    dominantColorset3 = get_dominant_colorset(img, thresh=0.1, ignore_crowd = True, peak_num=4)
+    mask1 = create_court_mask(img, dominantColorset1, True)
+    mask2 = create_court_mask(img, dominantColorset2, True)
+    mask3 = create_court_mask(img, dominantColorset3, True)
 
+    cv2.imshow('mask1', mask1)
+    cv2.imshow('mask2', mask2)
+    cv2.imshow('mask3', mask3)
+    """
+    small = get_middle_court(img)
+    cv2.imshow('small', small)
+    jersey1 = get_jersey1_colors(img, thresh=0.8, peak_num=3)
+    mask1 = create_court_mask(img, jersey1, True)
+    cv2.imshow('mask1', mask1)
     cv2.imshow('original', img)
-    cv2.imshow('mask', mask)
+
+
 
     cv2.waitKey(0)
 

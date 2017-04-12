@@ -143,11 +143,11 @@ def main(args):
             frameObject = fo.FrameObject(img, currentFrame, args.vid, colors.GSW_AWAY, colors.OKC_HOME)
             #frameObject = fo.FrameObject(img, currentFrame, args.vid, colors.HOU_AWAY, colors.SAS_HOME)
 
-            frameObject.showAwayJerseyMask()
-            frameObject.showAwayMaskCentroids()
+            #frameObject.showAwayJerseyMask()
+            #frameObject.showAwayMaskCentroids()
             #frameObject.showHomeJerseyMask()
             #frameObject.showHomeMaskCentroids()
-            #frameObject.show()
+            frameObject.show()
 
             #frameObject.show_home_player_coordinates()
 
