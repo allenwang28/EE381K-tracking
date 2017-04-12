@@ -12,8 +12,8 @@ import colors
 fileDir = os.path.dirname(os.path.realpath(__file__))
 vidDir = os.path.join(fileDir, '..', 'videos')
 
-defaultVidPath = os.path.join(vidDir, 'housas-1.mp4')
-#defaultVidPath = os.path.join(vidDir, 'gswokc-1.mp4')
+#defaultVidPath = os.path.join(vidDir, 'housas-1.mp4')
+defaultVidPath = os.path.join(vidDir, 'gswokc-5.mp4')
 
 # NOTE - this is required because we only found the 
 # ranges for a limited number of teams
@@ -135,11 +135,19 @@ def main(args):
         # Operations goes here
 
         try:
-            #frameObject = fo.FrameObject(img, currentFrame, args.vid, GSW_AWAY, OKC_HOME)
-            frameObject = fo.FrameObject(img, currentFrame, args.vid, colors.HOU_AWAY, colors.SAS_HOME)
-            #frameObject.show_away_mask_centroids()
-            #frameObject.show_away_jersey_mask()
-            frameObject.show()
+            currentFrame += 1
+            """
+            if currentFrame < 45:
+                continue
+            """
+            frameObject = fo.FrameObject(img, currentFrame, args.vid, colors.GSW_AWAY, colors.OKC_HOME)
+            #frameObject = fo.FrameObject(img, currentFrame, args.vid, colors.HOU_AWAY, colors.SAS_HOME)
+
+            frameObject.showAwayJerseyMask()
+            frameObject.showAwayMaskCentroids()
+            #frameObject.showHomeJerseyMask()
+            #frameObject.showHomeMaskCentroids()
+            #frameObject.show()
 
             #frameObject.show_home_player_coordinates()
 
@@ -151,7 +159,6 @@ def main(args):
         except Exception as inst:
             print(inst)
             print "Continuing"
-        currentFrame += 1
 
         # Display things here
         #cv2.imshow('frame', img)

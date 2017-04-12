@@ -87,8 +87,10 @@ class FrameObject():
             # hough.put_lines_on_img(img, lines)
             # cv2.imwrite('images/6584_toplines.jpg', img)
             if len(lines) < 2:
-                _baselineDetected = False
+                self._baselineDetected = False
                 raise Exception("Baseline not detected")
+                #print("Baseline not detected")
+                #return None
             self._sideline = lines[0]
             self._baseline = lines[1]
         return self._sideline
@@ -208,36 +210,50 @@ class FrameObject():
         self.getAwayMaskCentroids()
         self.getHomeMaskCentroids()
 
-    def drawLines(self, img=_bgrImg):
+    def drawLines(self, img=None):
+        if img is None:
+            img = self.getBgrImg()
         lines = [self.getFreethrowline(), self.getClosepaintline(),
             self.getSideline(), self.getBaseline()]
         if not self.allLinesDetected():
             raise Exception("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
+            #print("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
         #img = colors.gray_to_bgr(self.getGrayFlooded2())
+        lines = [line for line in lines if line is not None]
         hough.put_lines_on_img(img, lines)
         return img
 
-    def drawPoints(self, img=_bgrImg):
+    def drawPoints(self, img=None):
+        if img is None:
+            img = self.getBgrImg()
         lines = [self.getFreethrowline(), self.getClosepaintline(),
             self.getSideline(), self.getBaseline()]
         if not self.allLinesDetected():
             raise Exception("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
+            #print("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
+        #lines = [line for line in lines if line is not None]
         hough.put_lines_on_img(img, lines)
         points = self.getQuadranglePoints()
         hough.put_points_on_img(img, points)
         return img
 
-    def drawAwayMaskCentroids(self, img=_bgrImg):
+    def drawAwayMaskCentroids(self, img=None):
+        if img is None:
+            img = self.getBgrImg()
         coordinates = self.getAwayMaskCentroids()
 
         circleColor = colors.hsv_to_bgr_color(self._homeColors[1])
+        #circleColor = colors.hsv_to_bgr_color(self._awayColors[0])
         for (x,y) in coordinates:
             circs = cv2.circle(img, (x,y), 5, circleColor, -1)
         return img
 
-    def drawHomeMaskCentroids(self, img=_bgrImg):
+    def drawHomeMaskCentroids(self, img=None):
+        if img is None:
+            img = self.getBgrImg()
         coordinates = self.getHomeMaskCentroids()
-        circleColor = colors.hsv_to_bgr_color(self._awayColors[1])
+        #circleColor = colors.hsv_to_bgr_color(self._awayColors[1])
+        circleColor = colors.hsv_to_bgr_color(self._homeColors[0])
         for (x,y) in coordinates:
             circs = cv2.circle(img, (x,y), 5, circleColor, -1)
         return img
