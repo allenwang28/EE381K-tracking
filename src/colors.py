@@ -29,6 +29,7 @@ SAS_HOME = (SAS_HOME_LOWER, SAS_HOME_UPPER)
 CROWD_TOP_HEIGHT_FRACTION = .31;
 CROWD_BOTTOM_HEIGHT_FRACTION = .2;
 
+TOP_OF_FEED = 0.2
 
 MID_TOP_HEIGHT_FRACTION = .5;
 MID_BOTTOM_HEIGHT_FRACTION = .4;
@@ -46,6 +47,9 @@ def remap_from_crowdless_coords(original_img, coords):
     for (x,y) in coords:
         new_coords.append((x, int(y + CROWD_TOP_HEIGHT_FRACTION*original_img.shape[0])))
     return new_coords 
+
+def get_top_image(img):
+    return img[0: int(TOP_OF_FEED*img.shape[0])]
 
 def get_crowdless_image(img):
     return img[int(CROWD_TOP_HEIGHT_FRACTION*img.shape[0]) : int(-CROWD_BOTTOM_HEIGHT_FRACTION*img.shape[0])]
