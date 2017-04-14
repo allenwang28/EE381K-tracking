@@ -328,11 +328,7 @@ class FrameObject():
                 ]
                 calcPoints = np.array(calcPoints).astype(float)
                 realPoints = np.array(realPoints).astype(float)
-                print calcPoints
-                print realPoints
                 h, status = cv2.findHomography(calcPoints, realPoints)
-                print h
-                print status
                 self._homography = h
             except Exception as e:
                 return None

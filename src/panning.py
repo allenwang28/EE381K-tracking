@@ -22,9 +22,17 @@ class Panner:
         self._fps = int(self._cap.get(cv2.cv.CV_CAP_PROP_FPS))
 
     def getPanningTrajectory(self):
-        if self._smoothedTrajectroy is None:
+        if self._smoothedTrajectory is None:
             # Take first frame and find corners in it
-            ret, old_frame = cap.read()
+            feature_params = dict( maxCorners = 200,
+                                       qualityLevel = 0.01,
+                                       minDistance = 30.0,
+                                       blockSize = 3 )
+                # Parameters for lucas kanade optical flow
+            lk_params = dict( winSize  = (15,15),
+                              maxLevel = 2,
+                              criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+            ret, old_frame = self._cap.read()
             old_gray = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
             p0 = cv2.goodFeaturesToTrack(old_gray, mask = None, **feature_params)
             # Create a mask image for drawing purposes
@@ -35,9 +43,11 @@ class Panner:
             last_T = None
             prev_to_cur_transform = []
 
+            curr = 0
+
             while(curr < self._numFrames - 1):
                 curr += 1
-                ret, frame = cap.read()
+                ret, frame = self._cap.read()
                 frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
                 p1, st, err = cv2.calcOpticalFlowPyrLK(old_gray, frame_gray, p0, None, **lk_params)

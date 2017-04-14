@@ -82,7 +82,8 @@ class Engine:
     _homeTrajectories = None
     _awayTrajectories = None
 
-    _picklePath = None
+    _frameObjectsPath = None
+    _panningTrajectoriesPath = None
 
 
     def __init__(self, video, awayTeam, homeTeam, side, verbose = True):
@@ -100,7 +101,8 @@ class Engine:
         self._cap = cv2.VideoCapture(video)
         self._capLength = int(self._cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
         videoTitle = os.path.splitext(os.path.basename(video))[0]
-        self._picklePath = os.path.join(dataPath, '{}-frames.p'.format(videoTitle))
+        self._frameObjectsPath = os.path.join(dataPath, '{}-frames.p'.format(videoTitle))
+        self._panningTrajectoriesPath = os.path.join(dataPath, '{}-traj.p'.format(videoTitle))
         if verbose:
             print(("#===== Opening {} =====#".format(video)))
             print(("Successful?: {}".format(str(self._cap.isOpened()))))
@@ -121,8 +123,16 @@ class Engine:
 
     def getPanningTrajectory(self):
         if self._panningTrajectory is None:
-            panner = Panner(self._video)
-            self._panningTrajectory = panner.getPanningTrajectory()
+            if os.path.isfile(self._panningTrajectoriesPath):
+                self._panningTrajectory = pickle.load(open(self._panningTrajectoriesPath, "rb")).fillna(0)
+                if self._verbose:
+                    print "Opening trajectories pickle file from {}".format(self._panningTrajectoriesPath)
+            else:
+                panner = Panner(self._video)
+                self._panningTrajectory = panner.getPanningTrajectory().fillna(0)
+                pickle.dump(self._panningTrajectory, open(self._panningTrajectoriesPath, "wb"))
+                if self._verbose:
+                    print "Saving panning trajectory pickle file to {}".format(self._panningTrajectoriesPath)
         return self._panningTrajectory
 
     def getHomographies(self):
@@ -160,7 +170,7 @@ class Engine:
 
             # Go in reverse and adjust the locations using panning
             for i, frameObject in reversed(list(enumerate(frameObjects[:firstValidIdx]))):
-                trajectory = trajectories[i]
+                trajectory = trajectories.loc[i]
                 updatedPoints = [[component - dcomponent for component,dcomponent in zip(pt, trajectory)]  for pt in lastPoints] 
                 frameObject.setQuadranglePts(updatedPoints)
                 homographies[i] = frameObject.getHomography()
@@ -168,14 +178,15 @@ class Engine:
             # Go forward and update based on trajectory
             lastPoints = frameObject.getQuadranglePoints()
             for i, frameObject in enumerate(frameObjects[firstValidIdx:]):
-                if homographies[i] is None:
-                    trajectory = trajectories[i]
+                if homographies[i] is None or frameObject.getQuadranglePoints() is None:
+                    trajectory = trajectories.loc[i]
                     updatedPoints = [[component + dcomponent for component,dcomponent in zip(pt, trajectory)]  for pt in lastPoints] 
                     frameObject.setQuadranglePts(updatedPoints)
                     homographies[i] = frameObject.getHomography()
                 else:
                     lastPoints = frameObject.getQuadranglePoints()
             self._homographies = homographies 
+            print homographies
         return self._homographies
 
 
@@ -191,14 +202,14 @@ class Engine:
 
     def getFrameObjects(self):
         if self._frameObjects is None:
-            if os.path.isfile(self._picklePath):
-                self._frameObjects = pickle.load(open(self._picklePath, "rb"))
-                assert len(self._frameObjects) == self._capLength # Sanity check
+            if os.path.isfile(self._frameObjectsPath):
+                self._frameObjects = pickle.load(open(self._frameObjectsPath, "rb"))
+                assert len(self._frameObjects) == self._capLength - 1 # Sanity check
                 if self._verbose:
-                    print "Opening pickle file from {}".format(self._picklePath)
+                    print "Opening fo pickle file from {}".format(self._frameObjectsPath)
             else:
                 if self._verbose:
-                    print "No pkl file found from {}. Generating frame objects".format(self._picklePath)
+                    print "No fo pkl file found from {}. Generating frame objects".format(self._frameObjectsPath)
                 self._frameObjects = []
                 frameNum = 0
                 while(frameNum < self._capLength - 1):
@@ -220,9 +231,9 @@ class Engine:
                     except Exception as e:
                         if self._verbose:
                             print (e)
-                pickle.dump(self._frameObjects, open(self._picklePath, "web"))
+                pickle.dump(self._frameObjects, open(self._frameObjectsPath, "wb"))
                 if self._verbose:
-                    print "Saving pickle file to {}".format(self._picklePath)
+                    print "Saving fo pickle file to {}".format(self._frameObjectsPath)
         return self._frameObjects
 
 
