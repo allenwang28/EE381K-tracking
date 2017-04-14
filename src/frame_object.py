@@ -11,6 +11,9 @@ import hough
 from geometry import get_intersection
 import cluster
 
+import homography
+from homography import NbaCourt as nba
+
 class FrameObject():
     # Variables
     _frameNum = None
@@ -32,6 +35,8 @@ class FrameObject():
     # Trackers
     _trackers = None
 
+    _side = None
+
     # Booleans
     _sidelineDetected = True
     _baselineDetected = True
@@ -44,11 +49,18 @@ class FrameObject():
     _closepaintFreethrow = None # Int btw close paintline and freethrow line
     _sidelineFreethrow = None # Int btw far sideline and freethrow line
 
+    _pts = None
+
     _awayMaskCentroids = None
     _homeMaskCentroids = None
 
-    def __init__(self, img, frameNum, videoTitle, awayColors, homeColors):
+    _homography = None
+
+    def __init__(self, img, frameNum, videoTitle, awayColors, homeColors, side):
         assert img is not None
+        if side not in ['left', 'right']:
+            raise Exception("Invalid side provided: {}".format(side))
+        self._side = side
         self._bgrImg = img
         self._frameNum = frameNum
         self._videoTitle = videoTitle
@@ -121,12 +133,16 @@ class FrameObject():
 
 
     def getQuadranglePoints(self):
-        pts = []
-        pts.append(get_intersection(self.getSideline(), self.getFreethrowline()))
-        pts.append(get_intersection(self.getSideline(), self.getBaseline()))
-        pts.append(get_intersection(self.getClosepaintline(), self.getBaseline()))
-        pts.append(get_intersection(self.getClosepaintline(), self.getFreethrowline()))
-        return pts
+        if self._pts is None:
+            try:
+                self._pts = []
+                self._pts.append(get_intersection(self.getSideline(), self.getFreethrowline()))
+                self._pts.append(get_intersection(self.getSideline(), self.getBaseline()))
+                self._pts.append(get_intersection(self.getClosepaintline(), self.getBaseline()))
+                self._pts.append(get_intersection(self.getClosepaintline(), self.getFreethrowline()))
+            except:
+                self._pts = None
+        return self._pts
 
 
     def getAwayJerseyMask(self):
@@ -162,6 +178,9 @@ class FrameObject():
 
     def getNumHomeMaskCentroids(self):
         return len(self.getHomeMaskCentroids())
+
+    def setQuadranglePts(self, quadranglePts):
+        self._pts = quadranglePts
 
     def freethrowlineDetected(self):
         return self._freethrowlineDetected
@@ -232,7 +251,7 @@ class FrameObject():
             raise Exception("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
             #print("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
         #lines = [line for line in lines if line is not None]
-        hough.put_lines_on_img(img, lines)
+        #hough.put_lines_on_img(img, lines)
         points = self.getQuadranglePoints()
         hough.put_points_on_img(img, points)
         return img
@@ -292,6 +311,39 @@ class FrameObject():
             pass
         cv2.imshow('frame-info', frame)
 
+    def getHomography(self):
+        if self._homography is None:
+            # Quadrangle points are in this order:
+            # 1. sideline freethrowline
+            # 2. sideline baseline
+            # 3. closepaintline baseline
+            # 4. closepaintline freethrowline
+            try:
+                calcPoints = self.getQuadranglePoints()
+                realPoints = [
+                    nba.get_loc_coords('sideline, freethrow',self._side),
+                    nba.get_loc_coords('sideline, baseline',self._side),
+                    nba.get_loc_coords('closepaint, baseline',self._side),
+                    nba.get_loc_coords('closepaint, freethrow',self._side),
+                ]
+                calcPoints = np.array(calcPoints).astype(float)
+                realPoints = np.array(realPoints).astype(float)
+                print calcPoints
+                print realPoints
+                h, status = cv2.findHomography(calcPoints, realPoints)
+                print h
+                print status
+                self._homography = h
+            except Exception as e:
+                return None
+        return self._homography
+
+    def showHomography(self):
+        img = self.getBgrImg()
+        h = self.getHomography()
+        im_out = cv2.warpPerspective(img, h, (img.shape[0], 1500))
+        cv2.imshow('homography', im_out)
+
 
 def testlines(img_obj, save_filename):
     lines = [img_obj.getFreethrowline(), img_obj.getClosepaintline(),
@@ -317,14 +369,12 @@ if __name__ == '__main__':
     imgDir = os.path.join(fileDir, '..', 'images')
 
     sampleImgPath = os.path.join(imgDir, 'test.jpg')
-    GSW_JERSEY_UPPER = (115, 190, 80)
-    GSW_JERSEY_LOWER = (125, 260, 260)
 
     img = cv2.imread(sampleImgPath)
     
-    fo = FrameObject(img, 0, '', (GSW_JERSEY_UPPER, GSW_JERSEY_LOWER))
+    fo = FrameObject(img, 0, '', colors.GSW_AWAY, colors.OKC_HOME, 'left')
+    fo.showHomography()
 
-    fo.showAwayMaskCentroids()
 
     cv2.waitKey(0)
 

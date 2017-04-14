@@ -12,14 +12,14 @@ vidDir = os.path.join(fileDir, '..', 'videos')
 defaultVidPath = os.path.join(vidDir, 'gswokc-2.mp4')
 
 
-def panner:
+class Panner:
     _cap = None
     _smoothedTrajectory = None
 
     def __init__(self, videoPath):
         self._cap = cv2.VideoCapture(videoPath)
         self._numFrames = int(self._cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
-        self._fps = int(cap.get(cv2.cv.CV_CAP_PROP_FPS))
+        self._fps = int(self._cap.get(cv2.cv.CV_CAP_PROP_FPS))
 
     def getPanningTrajectory(self):
         if self._smoothedTrajectroy is None:
@@ -74,6 +74,8 @@ if __name__ == "__main__":
     cap = cv2.VideoCapture(defaultVidPath)
     curr = 0
 
+    numFrames = int(cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
+    fps = int(cap.get(cv2.cv.CV_CAP_PROP_FPS))
     # params for ShiTomasi corner detection
     feature_params = dict( maxCorners = 200,
                            qualityLevel = 0.01,
@@ -127,6 +129,9 @@ if __name__ == "__main__":
     trajectory = pd.DataFrame(trajectory)
     smoothed_trajectory = pd.rolling_mean(trajectory, window=30)
     smoothed_trajectory.fillna(method='bfill')
+
+    print len(smoothed_trajectory)
+    print numFrames
     new_prev_to_cur_transform = prev_to_cur_transform + (smoothed_trajectory - trajectory)
 
     T = np.zeros((2,3))
