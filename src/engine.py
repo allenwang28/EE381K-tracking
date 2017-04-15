@@ -134,6 +134,65 @@ class Engine:
                 if self._verbose:
                     print "Saving panning trajectory pickle file to {}".format(self._panningTrajectoriesPath)
         return self._panningTrajectory
+    
+    def fillQuadranglePoints(self):
+        # Fills in the quadrangle points for all of the frame objects in case it doesn't exist already
+        # It uses the panning trajectories to do this
+        if self._verbose:
+            print "Setting quadrangle points"
+        frameObjects = self.getFrameObjects()
+        trajectories = self.getPanningTrajectory()
+        # Get all possible quadrangle points 
+        allPts = []
+        for frameObject in frameObjects:
+            pts = frameObject.getQuadranglePoints()
+            allPts.append(pts)
+
+        # Note - index of trajectory i is the trajectory from frame i to i+1
+        # e.g. trajectory[0]  is the trajectory from 0 to 1`
+        
+        # Algorithm:
+        # 1. Find the first valid points in the list
+        # 2. Calculate the new quadrangle coordinates with a transform 
+        #    of the last known point (going in reverse)
+        # 3. Set the updated points in the frame
+        # 4. Repeat steps 2 and 3 except forward until there are no more nones in the list
+        firstValidIdx = notNoneIdx(allPts)
+
+        if self._verbose:
+            print "First valid index was: {}".format(firstValidIdx)
+        
+        lastFrameObject = frameObjects[firstValidIdx]
+        lastPoints = lastFrameObject.getQuadranglePoints()
+
+        if self._verbose:
+            print "Updating points backwards..."
+
+        # Go in reverse and adjust the locations using panning
+        for i, frameObject in reversed(list(enumerate(frameObjects[:firstValidIdx]))):
+            trajectory = trajectories.loc[i]
+            updatedPoints = [[component - dcomponent for component,dcomponent in zip(pt, trajectory)]  for pt in lastPoints] 
+            frameObject.setQuadranglePts(updatedPoints)
+            allPts[i] = frameObject.getQuadranglePoints()
+
+        # Go forward and update based on trajectory
+        lastPoints = frameObject.getQuadranglePoints()
+        for i, frameObject in enumerate(frameObjects[firstValidIdx:]):
+            if allPts[i] is None or frameObject.getQuadranglePoints() is None:
+                trajectory = trajectories.loc[i]
+                updatedPoints = [[component + dcomponent for component,dcomponent in zip(pt, trajectory)]  for pt in lastPoints] 
+                frameObject.setQuadranglePts(updatedPoints)
+                allPts[i] = frameObject.getQuadranglePoints()
+            else:
+                lastPoints = frameObject.getQuadranglePoints()
+    
+    def showQuadranglePoints(self):
+        self.fillQuadranglePoints()
+        if self._verbose:
+            print "Showing quadrangle points"
+        for frameObject in self.getFrameObjects():
+            frameObject.showPoints()
+            cv2.waitKey(20)
 
     def getHomographies(self):
         if self._homographies is None:
@@ -206,7 +265,7 @@ class Engine:
                 self._frameObjects = pickle.load(open(self._frameObjectsPath, "rb"))
                 assert len(self._frameObjects) == self._capLength - 1 # Sanity check
                 if self._verbose:
-                    print "Opening fo pickle file from {}".format(self._frameObjectsPath)
+                    print "Opening frame object pickle file from {}".format(self._frameObjectsPath)
             else:
                 if self._verbose:
                     print "No fo pkl file found from {}. Generating frame objects".format(self._frameObjectsPath)
@@ -236,10 +295,19 @@ class Engine:
                     print "Saving fo pickle file to {}".format(self._frameObjectsPath)
         return self._frameObjects
 
+    def show(self):
+        self.fillQuadranglePoints()
+        frameObjects = self.getFrameObjects()
+        for frameObject in frameObjects:
+            frameObject.show()
+            cv2.waitKey(20)
+
+
 
 def testEngineMain(args):
     engine = Engine(args.vid, args.away, args.home, args.side, args.verbose)
-    print engine.getHomographies()
+    #engine.showQuadranglePoints()
+    engine.show()
 
 def main(args):
     cap = cv2.VideoCapture(args.vid)

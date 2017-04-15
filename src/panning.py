@@ -140,8 +140,6 @@ if __name__ == "__main__":
     smoothed_trajectory = pd.rolling_mean(trajectory, window=30)
     smoothed_trajectory.fillna(method='bfill')
 
-    print len(smoothed_trajectory)
-    print numFrames
     new_prev_to_cur_transform = prev_to_cur_transform + (smoothed_trajectory - trajectory)
 
     T = np.zeros((2,3))

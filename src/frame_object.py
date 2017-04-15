@@ -245,13 +245,6 @@ class FrameObject():
     def drawPoints(self, img=None):
         if img is None:
             img = self.getBgrImg()
-        lines = [self.getFreethrowline(), self.getClosepaintline(),
-            self.getSideline(), self.getBaseline()]
-        if not self.allLinesDetected():
-            raise Exception("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
-            #print("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
-        #lines = [line for line in lines if line is not None]
-        #hough.put_lines_on_img(img, lines)
         points = self.getQuadranglePoints()
         hough.put_points_on_img(img, points)
         return img
