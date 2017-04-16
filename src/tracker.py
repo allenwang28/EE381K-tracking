@@ -86,6 +86,9 @@ class Tracker:
             print e
             return None
 
+    def isLive(self):
+        return not self.getTrackWindow() == (0, 0, 0, 0)
+
     def drawOnFrame(self, frame):
         x,y,w,h = self.getTrackWindow() 
         img = cv2.rectangle(frame, (x,y), (x+w, y+h), (255, 255, 255), 1)

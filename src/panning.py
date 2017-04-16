@@ -76,8 +76,11 @@ class Panner:
             prev_to_cur_transform = np.array(prev_to_cur_transform)
             trajectory = np.cumsum(prev_to_cur_transform, axis=0)
             trajectory = pd.DataFrame(trajectory)
-            self._smoothedTrajectory = pd.rolling_mean(trajectory, window=30)
-            self._smoothedTrajectory.fillna(method='bfill')
+            # self._smoothedTrajectory = pd.rolling_mean(trajectory, window=30)
+            # self._smoothedTrajectory.fillna(method='bfill')
+
+            trajectory.fillna(method='bfill')
+            self._smoothedTrajectory = trajectory
         return self._smoothedTrajectory
 
 if __name__ == "__main__":

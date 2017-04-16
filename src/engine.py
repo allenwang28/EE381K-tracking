@@ -11,6 +11,8 @@ import colors
 import panning
 from panning import Panner
 
+from tracker import Tracker
+
 import pickle
 
 
@@ -66,7 +68,7 @@ class Engine:
 
     # Lists
     _frameObjects = None
-    _trackers = None
+    _awayTrackers = None
 
     # Booleans
     _verbose = True
@@ -85,6 +87,8 @@ class Engine:
     _frameObjectsPath = None
     _panningTrajectoriesPath = None
 
+    _trackers = None
+
 
     def __init__(self, video, awayTeam, homeTeam, side, verbose = True):
         self._video = video
@@ -100,9 +104,12 @@ class Engine:
         self._side = side
         self._cap = cv2.VideoCapture(video)
         self._capLength = int(self._cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
-        videoTitle = os.path.splitext(os.path.basename(video))[0]
-        self._frameObjectsPath = os.path.join(dataPath, '{}-frames.p'.format(videoTitle))
-        self._panningTrajectoriesPath = os.path.join(dataPath, '{}-traj.p'.format(videoTitle))
+        self._videoTitle = os.path.splitext(os.path.basename(video))[0]
+        self._frameObjectsPath = os.path.join(dataPath, '{}-frames.p'.format(self._videoTitle))
+        self._panningTrajectoriesPath = os.path.join(dataPath, '{}-traj.p'.format(self._videoTitle))
+
+        self._fourcc = cv2.cv.CV_FOURCC(*'X264')
+
         if verbose:
             print(("#===== Opening {} =====#".format(video)))
             print(("Successful?: {}".format(str(self._cap.isOpened()))))
@@ -111,6 +118,10 @@ class Engine:
             print(("FPS: {}".format(str(self._cap.get(cv2.cv.CV_CAP_PROP_FPS)))))
             print(("Frame count: {}".format(self._capLength)))
 
+    def destroy(self):
+        self._cap.release()
+        cv2.destroyAllWindows()
+        
     def getAwayColors(self):
         if self._awayColors is None:
             self._awayColors = AWAY_TEAM_COLOR_DICT[self._awayTeam]
@@ -134,6 +145,92 @@ class Engine:
                 if self._verbose:
                     print "Saving panning trajectory pickle file to {}".format(self._panningTrajectoriesPath)
         return self._panningTrajectory
+
+    def showPoints(self):
+        frameObjects = self.getFrameObjects()
+
+        savedVidPath = os.path.join(vidDir, '{}-pts.avi'.format(self._videoTitle))
+        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (1280, 720))
+
+        if self._verbose:
+            print "Saving points"
+            print "Saving to {}".format(savedVidPath)
+
+        for frameObject in frameObjects:
+            img = frameObject.drawPoints()
+            out.write(img)
+            cv2.imshow('points', img)
+            cv2.waitKey(20)
+        out.release()
+
+
+    def showHomeCentroids(self):
+        frameObjects = self.getFrameObjects()
+
+        savedVidPath = os.path.join(vidDir, '{}-homeCentroids.avi'.format(self._videoTitle))
+        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (1280, 720))
+
+        if self._verbose:
+            print "Showing home centroids"
+            print "Saving to {}".format(savedVidPath)
+
+        for frameObject in frameObjects:
+            img = frameObject.drawHomeMaskCentroids()
+            out.write(img)
+            cv2.imshow('home centroids', img)
+            cv2.waitKey(20)
+        out.release()
+        
+
+    def showAwayCentroids(self):
+        frameObjects = self.getFrameObjects()
+
+        savedVidPath = os.path.join(vidDir, '{}-awayCentroids.avi'.format(self._videoTitle))
+        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (1280, 720))
+
+        if self._verbose:
+            print "Showing away centroids"
+            print "Saving to {}".format(savedVidPath)
+
+        for frameObject in frameObjects:
+            img = frameObject.drawAwayMaskCentroids()
+            out.write(img)
+            cv2.imshow('away centroids', img)
+            cv2.waitKey(20)
+        out.release()
+
+    # This doesn't work
+    def getAwayTrackers(self):
+        if self._verbose:
+            print "Setting away trackers"
+        frameObjects = self.getFrameObjects()
+
+        firstValidIdx = 0
+        centroids = None
+        # Look for the first frame object with only 5 jerseys detected 
+        for i, frameObject in enumerate(frameObjects):
+            if len(frameObject.getAwayMaskCentroids()) == 5:
+                firstValidIdx = i 
+                centroids = frameObject.getAwayMaskCentroids()
+        if centroids is None:
+            raise Exception("No valid away centroids detected")
+        self._awayTrackers = []
+
+        for centroid in centroids:
+            self._awayTrackers.append(Tracker(frameObjects[firstValidIdx].getBgrImg(),
+                                              centroid[0],
+                                              5,
+                                              centroid[1],
+                                              5))
+
+        for frameObject in frameObjects[firstValidIdx:]:
+            frame = frameObject.getBgrImg()
+            for tracker in self._awayTrackers:
+                if tracker.isLive():
+                    tracker.drawOnFrame(frame)
+            cv2.imshow('away trajectory', frame)
+            cv2.waitKey(20)
+
     
     def fillQuadranglePoints(self):
         # Fills in the quadrangle points for all of the frame objects in case it doesn't exist already
@@ -186,13 +283,21 @@ class Engine:
             else:
                 lastPoints = frameObject.getQuadranglePoints()
     
-    def showQuadranglePoints(self):
+    def showFilledPoints(self):
         self.fillQuadranglePoints()
+
+        savedVidPath = os.path.join(vidDir, '{}-filledPts.avi'.format(self._videoTitle))
+        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (1280, 720))
         if self._verbose:
-            print "Showing quadrangle points"
+            print "Showing filled quadrangle points"
+            print "Saving to {}".format(savedVidPath)
+
         for frameObject in self.getFrameObjects():
-            frameObject.showPoints()
+            img = frameObject.drawPoints()
+            out.write(img)
+            cv2.imshow('filled points', img)
             cv2.waitKey(20)
+        out.release()
 
     def getHomographies(self):
         if self._homographies is None:
@@ -303,11 +408,18 @@ class Engine:
             cv2.waitKey(20)
 
 
-
 def testEngineMain(args):
     engine = Engine(args.vid, args.away, args.home, args.side, args.verbose)
-    #engine.showQuadranglePoints()
-    engine.show()
+    if args.mode == 'show':
+        if args.awayPoints:
+            engine.showAwayCentroids()
+        if args.homePoints:
+            engine.showHomeCentroids()
+        if args.court:
+            engine.showPoints()
+        if args.courtFilled:
+            engine.showFilledPoints()
+    engine.destroy()
 
 def main(args):
     cap = cv2.VideoCapture(args.vid)
@@ -390,6 +502,22 @@ if __name__ == "__main__":
     parser.add_argument('--home', type=str,
                         help="Home team",
                         default='OKC')
+
+    subparsers = parser.add_subparsers(dest='mode', help="Mode")
+    showParser = subparsers.add_parser(
+        'show', help='Show things related to the court.')
+
+    showParser.add_argument('--awayPoints', action='store_true',
+                             help='Show away mask centroids')
+
+    showParser.add_argument('--homePoints', action='store_true',
+                             help='Show home mask centroids')
+
+    showParser.add_argument('--court', action='store_true',
+                             help='Show the court points')
+
+    showParser.add_argument('--courtFilled', action='store_true',
+                             help='Show the court points adjusted with panning')
 
     args = parser.parse_args()
 

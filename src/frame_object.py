@@ -246,6 +246,8 @@ class FrameObject():
         if img is None:
             img = self.getBgrImg()
         points = self.getQuadranglePoints()
+        if points is None:
+            return img
         hough.put_points_on_img(img, points)
         return img
 
@@ -264,8 +266,8 @@ class FrameObject():
         if img is None:
             img = self.getBgrImg()
         coordinates = self.getHomeMaskCentroids()
-        #circleColor = colors.hsv_to_bgr_color(self._awayColors[1])
-        circleColor = colors.hsv_to_bgr_color(self._homeColors[0])
+        circleColor = colors.hsv_to_bgr_color(self._awayColors[1])
+        #circleColor = colors.hsv_to_bgr_color(self._homeColors[0])
         for (x,y) in coordinates:
             circs = cv2.circle(img, (x,y), 5, circleColor, -1)
         return img
