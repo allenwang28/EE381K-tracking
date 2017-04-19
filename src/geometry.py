@@ -2,6 +2,8 @@ import numpy as np
 
 
 def get_intersection(line_1, line_2):
+    if line_1 is None or line_2 is None:
+        return None
 	rho_1, theta_1 = line_1
 	#print theta_1, rho_1
 	rho_2, theta_2 = line_2

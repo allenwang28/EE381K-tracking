@@ -100,9 +100,12 @@ class FrameObject():
             # cv2.imwrite('images/6584_toplines.jpg', img)
             if len(lines) < 2:
                 self._baselineDetected = False
-                raise Exception("Baseline not detected")
-                #print("Baseline not detected")
+                #raise Exception("Baseline not detected")
+                print("Baseline not detected")
                 #return None
+                self._sideline = lines[0]
+                self._baseline = None
+                return self._sideline
             self._sideline = lines[0]
             self._baseline = lines[1]
         return self._sideline
@@ -120,9 +123,14 @@ class FrameObject():
                 self.getSideline(), self.getBaseline(), verbose=True)
             if lines[0] is None:
                 self._freethrowlineDetected = False
+                self._freethrowline = None
+            else:
+                self._freethrowline = lines[0]
             if lines[1] is None:
                 self._closepaintlineDetected = False
-            self._freethrowline, self._closepaintline = lines
+                self._closepaintline = None
+            else:
+                self._closepaintline = lines[1]
         return self._freethrowline
 
 
@@ -134,14 +142,11 @@ class FrameObject():
 
     def getQuadranglePoints(self):
         if self._pts is None:
-            try:
-                self._pts = []
-                self._pts.append(get_intersection(self.getSideline(), self.getFreethrowline()))
-                self._pts.append(get_intersection(self.getSideline(), self.getBaseline()))
-                self._pts.append(get_intersection(self.getClosepaintline(), self.getBaseline()))
-                self._pts.append(get_intersection(self.getClosepaintline(), self.getFreethrowline()))
-            except:
-                self._pts = None
+            self._pts = []
+            self._pts.append(get_intersection(self.getSideline(), self.getFreethrowline()))
+            self._pts.append(get_intersection(self.getSideline(), self.getBaseline()))
+            self._pts.append(get_intersection(self.getClosepaintline(), self.getBaseline()))
+            self._pts.append(get_intersection(self.getClosepaintline(), self.getFreethrowline()))
         return self._pts
 
 
@@ -235,8 +240,8 @@ class FrameObject():
         lines = [self.getFreethrowline(), self.getClosepaintline(),
             self.getSideline(), self.getBaseline()]
         if not self.allLinesDetected():
-            raise Exception("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
-            #print("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
+            #raise Exception("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
+            print("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
         #img = colors.gray_to_bgr(self.getGrayFlooded2())
         lines = [line for line in lines if line is not None]
         hough.put_lines_on_img(img, lines)
@@ -246,8 +251,8 @@ class FrameObject():
         if img is None:
             img = self.getBgrImg()
         points = self.getQuadranglePoints()
-        if points is None:
-            return img
+        # Draw the points we were able to detect
+        points = [point for point in points if point is not None]
         hough.put_points_on_img(img, points)
         return img
 
