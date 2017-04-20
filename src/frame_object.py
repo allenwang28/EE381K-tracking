@@ -56,7 +56,9 @@ class FrameObject():
 
     _homography = None
 
-    def __init__(self, img, frameNum, videoTitle, awayColors, homeColors, side):
+    _verbose = True
+
+    def __init__(self, img, frameNum, videoTitle, awayColors, homeColors, side, verbose = True):
         assert img is not None
         if side not in ['left', 'right']:
             raise Exception("Invalid side provided: {}".format(side))
@@ -66,6 +68,8 @@ class FrameObject():
         self._videoTitle = videoTitle
         self._awayColors = awayColors
         self._homeColors = homeColors
+        self._verbose = verbose
+
 
     # Exported methods
     def getGrayMask(self):
@@ -100,14 +104,20 @@ class FrameObject():
             # cv2.imwrite('images/6584_toplines.jpg', img)
             if len(lines) < 2:
                 self._baselineDetected = False
+<<<<<<< HEAD
                 #raise Exception("Baseline not detected")
-                print("Baseline not detected")
+                if self._verbose:
+                    print("Baseline not detected")
+=======
+                raise Exception("Baseline not detected")
+                #print("Baseline not detected")
+>>>>>>> parent of 384e592... quick updates to show all possible points
                 #return None
-                self._sideline = lines[0]
-                self._baseline = None
-                return self._sideline
             self._sideline = lines[0]
             self._baseline = lines[1]
+            if self._verbose:
+                print "Sideline: {}".format(self._sideline)
+                print "Baseline: {}".format(self._baseline)
         return self._sideline
 
 
@@ -123,14 +133,28 @@ class FrameObject():
                 self.getSideline(), self.getBaseline(), verbose=True)
             if lines[0] is None:
                 self._freethrowlineDetected = False
+<<<<<<< HEAD
                 self._freethrowline = None
+                if self._verbose:
+                    print "Freethrow not detected"
             else:
                 self._freethrowline = lines[0]
+                if self._verbose:
+                    print "Freethrow: {}".format(self._freethrowline)
             if lines[1] is None:
                 self._closepaintlineDetected = False
                 self._closepaintline = None
+                if self._verbose:
+                    print "Close paint not detected"
             else:
                 self._closepaintline = lines[1]
+                if self._verbose:
+                    print "Close paint: {}".format(self._closepaintline)
+=======
+            if lines[1] is None:
+                self._closepaintlineDetected = False
+            self._freethrowline, self._closepaintline = lines
+>>>>>>> parent of 384e592... quick updates to show all possible points
         return self._freethrowline
 
 
@@ -142,11 +166,14 @@ class FrameObject():
 
     def getQuadranglePoints(self):
         if self._pts is None:
-            self._pts = []
-            self._pts.append(get_intersection(self.getSideline(), self.getFreethrowline()))
-            self._pts.append(get_intersection(self.getSideline(), self.getBaseline()))
-            self._pts.append(get_intersection(self.getClosepaintline(), self.getBaseline()))
-            self._pts.append(get_intersection(self.getClosepaintline(), self.getFreethrowline()))
+            try:
+                self._pts = []
+                self._pts.append(get_intersection(self.getSideline(), self.getFreethrowline()))
+                self._pts.append(get_intersection(self.getSideline(), self.getBaseline()))
+                self._pts.append(get_intersection(self.getClosepaintline(), self.getBaseline()))
+                self._pts.append(get_intersection(self.getClosepaintline(), self.getFreethrowline()))
+            except:
+                self._pts = None
         return self._pts
 
 
@@ -240,8 +267,14 @@ class FrameObject():
         lines = [self.getFreethrowline(), self.getClosepaintline(),
             self.getSideline(), self.getBaseline()]
         if not self.allLinesDetected():
+<<<<<<< HEAD
             #raise Exception("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
-            print("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
+            if self._verbose:
+                print("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
+=======
+            raise Exception("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
+            #print("Not all lines were detected. Undetected: {}".format(self.getUndetectedLines()))
+>>>>>>> parent of 384e592... quick updates to show all possible points
         #img = colors.gray_to_bgr(self.getGrayFlooded2())
         lines = [line for line in lines if line is not None]
         hough.put_lines_on_img(img, lines)
@@ -251,8 +284,19 @@ class FrameObject():
         if img is None:
             img = self.getBgrImg()
         points = self.getQuadranglePoints()
+<<<<<<< HEAD
         # Draw the points we were able to detect
+        if self._verbose:
+            print "Before"
+            print points
         points = [point for point in points if point is not None]
+        if self._verbose:
+            print "After"
+            print points
+=======
+        if points is None:
+            return img
+>>>>>>> parent of 384e592... quick updates to show all possible points
         hough.put_points_on_img(img, points)
         return img
 
@@ -307,7 +351,8 @@ class FrameObject():
             frame = self.drawAwayMaskCentroids(img=frame)
             frame  = self.drawPoints(img=frame)
         except Exception as e:
-            print e
+            if self._verbose:
+                print e
             pass
         cv2.imshow('frame-info', frame)
 

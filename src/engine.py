@@ -15,6 +15,8 @@ from tracker import Tracker
 
 import pickle
 
+import math
+
 
 fileDir = os.path.dirname(os.path.realpath(__file__))
 vidDir = os.path.join(fileDir, '..', 'videos')
@@ -56,6 +58,60 @@ def notNoneIdx(L):
         if element is not None:
             return i
     return None
+
+"""
+def getAllVelocities(last, this):
+    #print "=== # Get all velocities # ==="
+    assert len(last) == len(this)
+    velocities = []
+    for lastPos, thisPos in zip(last.getQuadranglePoints(), this.getQuadranglePoints()):
+        print "lastPos: {}, thisPos: {}".format(lastPos, thisPos)
+        if lastPos is None or thisPos is None:
+            velocities.append(None)
+        else:
+            velocities.append((lastPos[0] - thisPos[0], lastPos[1] - thisPos[1]))
+    return velocities
+"""
+def dist(a, b):
+    return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
+
+def updatedPoints(lastPts, thisPts):
+    print "=== # Getting average velocity # ==="
+    #assert len(lastPts) == len(thisPts)
+    xVelocities = []
+    yVelocities = []
+    avgVelocity = None
+
+    # First calculate the average velocity
+    for lastPt, thisPt in zip(lastPts, thisPts):
+        print "lastPt: {}, thisPt: {}".format(lastPt, thisPt)
+        if lastPt is None or thisPt is None:
+            continue
+        else:
+            xDiff = thisPt[0] - lastPt[0]
+            yDiff = thisPt[1] - lastPt[1]
+            xVelocities.append(xDiff)
+            yVelocities.append(yDiff)
+    if len(xVelocities) == 0 or len(yVelocities) == 0:
+        avgVelocity = [0,0]
+    else:
+        avgVelocity = [sum(xVelocities) / len(xVelocities), sum(yVelocities) / len(yVelocities)]
+    print "Average velocity: {}".format(avgVelocity)
+    if abs(avgVelocity[0]) > 10:
+        avgVelocity[0] = (avgVelocity[0] / abs(avgVelocity[0])) * 2
+    if abs(avgVelocity[1]) > 10:
+        avgVelocity[1] = (avgVelocity[1] / abs(avgVelocity[1])) * 2
+
+    newPts = []
+    # newPts = [(lastPt[0] + avgVelocity[0],lastPt[1] + avgVelocity[1]) for lastPt in lastPts]
+
+    # For any point that is very far away or one that doesn't exist, we'll update it with the average velocity
+    for lastPt, thisPt in zip(lastPts, thisPts):
+        if thisPt is None or dist(lastPt, thisPt) > 10:
+            newPts.append((lastPt[0] + avgVelocity[0], lastPt[1] + avgVelocity[1]))
+        else:
+            newPts.append(thisPt)
+    return newPts
 
 
 
@@ -149,6 +205,7 @@ class Engine:
     def showPoints(self):
         frameObjects = self.getFrameObjects()
 
+        
         savedVidPath = os.path.join(vidDir, '{}-pts.avi'.format(self._videoTitle))
         out = cv2.VideoWriter(savedVidPath, -1, 20.0, (1280, 720))
 
@@ -200,14 +257,10 @@ class Engine:
         out.release()
 
     # This doesn't work
-    def showAwayTrackers(self):
+    def getAwayTrackers(self):
         if self._verbose:
             print "Setting away trackers"
         frameObjects = self.getFrameObjects()
-
-        savedVidPath = os.path.join(vidDir, '{}-awayTrackers.avi'.format(self._videoTitle))
-        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (1280, 720))
-
 
         firstValidIdx = 0
         centroids = None
@@ -220,13 +273,8 @@ class Engine:
             raise Exception("No valid away centroids detected")
         self._awayTrackers = []
 
-        # Testing
-        firstValidIdx = 45
-        centroids = frameObjects[firstValidIdx].getAwayMaskCentroids()
-
         for centroid in centroids:
             self._awayTrackers.append(Tracker(frameObjects[firstValidIdx].getBgrImg(),
-            #self._awayTrackers.append(Tracker(frameObjects[firstValidIdx].getAwayJerseyMask(),
                                               centroid[0],
                                               5,
                                               centroid[1],
@@ -234,58 +282,65 @@ class Engine:
 
         for frameObject in frameObjects[firstValidIdx:]:
             frame = frameObject.getBgrImg()
-            #frame = frameObject.getAwayJerseyMask()
             for tracker in self._awayTrackers:
                 if tracker.isLive():
                     tracker.drawOnFrame(frame)
             cv2.imshow('away trajectory', frame)
-            out.write(frame)
             cv2.waitKey(20)
-        out.release()
 
-    def showHomeTrackers(self):
+    def fillQuadranglePoints(self):
+        self.testFunction()
         if self._verbose:
-            print "Setting home trackers"
+            print "Filling quadrangle points with velocity estimates"
         frameObjects = self.getFrameObjects()
 
-        savedVidPath = os.path.join(vidDir, '{}-homeTrackers.avi'.format(self._videoTitle))
-        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (1280, 720))
-
-
+        # find the first instance where two consecutive frames have all points
+        lastFrameObject = frameObjects[0]
         firstValidIdx = 0
-        centroids = None
-        # Look for the first frame object with only 5 jerseys detected 
+        for i, frameObject in enumerate(frameObjects[1:]):
+            if frameObject.allLinesDetected() and lastFrameObject.allLinesDetected():
+                firstValidIdx = i
+                break
+            else:
+                lastFrameObject = frameObject
+        if self._verbose:
+            print "First valid index: {}".format(firstValidIdx)
+
+        for i, frameObject in enumerate(frameObjects[firstValidIdx:]):
+            newPts = updatedPoints(lastFrameObject.getQuadranglePoints(), frameObject.getQuadranglePoints())
+
+            """
+            avgVelocity = getAverageVelocity(lastFrameObject, frameObject)
+            print "avgVelocity = {}".format(avgVelocity)
+            newPts = []
+            newPts = [(oldPt[0] + avgVelocity[0],oldPt[1] + avgVelocity[1]) for oldPt in lastFrameObject.getQuadranglePoints()]
+            frameObject.setQuadranglePts(newPts)
+            # TODO - do something if the average velocity is over some threshold
+            """
+            print "New points: {}".format(newPts)
+            frameObject.setQuadranglePts(newPts)
+            lastFrameObject = frameObject
+
+    def testFunction(self):
+        if self._verbose:
+            print "Finding first index for glitch"
+        frameObjects = self.getFrameObjects()
+        idx = 0
         for i, frameObject in enumerate(frameObjects):
-            if len(frameObject.gethomeMaskCentroids()) == 5:
-                firstValidIdx = i 
-                centroids = frameObject.gethomeMaskCentroids()
-        if centroids is None:
-            raise Exception("No valid home centroids detected")
-        self._homeTrackers = []
+            if len(frameObject.getQuadranglePoints()) != 4:
+                idx = i
+        print idx
 
-        for centroid in centroids:
-            self._homeTrackers.append(Tracker(frameObjects[firstValidIdx].getBgrImg(),
-            #self._homeTrackers.append(Tracker(frameObjects[firstValidIdx].gethomeJerseyMask(),
-                                              centroid[0],
-                                              5,
-                                              centroid[1],
-                                              5))
+        raw_input()
 
-        for frameObject in frameObjects[firstValidIdx:]:
-            frame = frameObject.getBgrImg()
-            #frame = frameObject.gethomeJerseyMask()
-            for tracker in self._homeTrackers:
-                if tracker.isLive():
-                    tracker.drawOnFrame(frame)
-            cv2.imshow('home trajectory', frame)
-            out.write(frame)
-            cv2.waitKey(20)
-        out.release()
 
     
-    def fillQuadranglePoints(self):
+    def fillQuadranglePointsWithTrajectories(self):
         # Fills in the quadrangle points for all of the frame objects in case it doesn't exist already
         # It uses the panning trajectories to do this
+
+
+
         if self._verbose:
             print "Setting quadrangle points"
         frameObjects = self.getFrameObjects()
@@ -435,7 +490,7 @@ class Engine:
                         print "Processing frame {}/{}".format(frameNum, self._capLength)
                     try:
                         frameObject = fo.FrameObject(img, frameNum, self._video, 
-                                self.getAwayColors(), self.getHomeColors(), self._side)
+                                self.getAwayColors(), self.getHomeColors(), self._side, self._verbose)
                         self._frameObjects.append(frameObject)
                         if self._verbose:
                             print "Generating"
@@ -444,8 +499,7 @@ class Engine:
                             frameObject.show()
 
                     except Exception as e:
-                        if self._verbose:
-                            print (e)
+                        print (e)
                 pickle.dump(self._frameObjects, open(self._frameObjectsPath, "wb"))
                 if self._verbose:
                     print "Saving fo pickle file to {}".format(self._frameObjectsPath)
@@ -470,10 +524,6 @@ def testEngineMain(args):
             engine.showPoints()
         if args.courtFilled:
             engine.showFilledPoints()
-        if args.awayTrackers:
-            engine.showAwayTrackers()
-        if args.homeTrackers:
-            engine.showHomeTrackers()
     engine.destroy()
 
 def main(args):
@@ -539,7 +589,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     
     parser.add_argument('--verbose', action='store_true',
-                        default=True)
+                        default=False)
     
     parser.add_argument('--vid', type=str,
                         help="Video file.",
@@ -573,12 +623,6 @@ if __name__ == "__main__":
 
     showParser.add_argument('--courtFilled', action='store_true',
                              help='Show the court points adjusted with panning')
-
-    showParser.add_argument('--awayTrackers', action='store_true',
-                             help='Show the away trackers')
-
-    showParser.add_argument('--homeTrackers', action='store_true',
-                             help='Show the home trackers')
 
     args = parser.parse_args()
 
