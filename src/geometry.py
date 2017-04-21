@@ -2,7 +2,6 @@ import numpy as np
 
 
 def get_intersection(line_1, line_2):
-<<<<<<< HEAD
     if line_1 is None:
         return None
     if line_2 is None:
@@ -19,15 +18,6 @@ def get_intersection(line_1, line_2):
     b_2 = np.sin(theta_2)
     slope_2 = a_2 / -b_2
     intercept_2 = rho_2 / b_2
-=======
-	rho_1, theta_1 = line_1
-	#print theta_1, rho_1
-	rho_2, theta_2 = line_2
-	a_1 = np.cos(theta_1)
-	b_1 = np.sin(theta_1)
-	slope_1 = a_1 / -b_1
-	intercept_1 = rho_1 / b_1
->>>>>>> parent of 384e592... quick updates to show all possible points
 
     x_intersection = (intercept_2 - intercept_1) / (slope_1 - slope_2)
     y_intersection = x_intersection * slope_1 + intercept_1

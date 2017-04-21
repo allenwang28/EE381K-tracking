@@ -75,9 +75,26 @@ def getAllVelocities(last, this):
 def dist(a, b):
     return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
 
-def updatedPoints(lastPts, thisPts):
+def getClosestPts(lastPts, thisPts):
+    newPts = []
+
+    for lastPt in lastPts:
+        minDist = 10000000000
+        closestPt = None
+        for thisPt in thisPts:
+            distance = dist(lastPt, thisPt)
+            if distance < minDist:
+                minDist = distance
+                closestPt = thisPt
+            if closestPt is not None:
+                thisPts.remove(closestPt)
+        newPts.append(closestPt)    
+    return newPts 
+
+
+def updatedCourtPoints(lastPts, thisPts):
     print "=== # Getting average velocity # ==="
-    #assert len(lastPts) == len(thisPts)
+    assert len(lastPts) == len(thisPts)
     xVelocities = []
     yVelocities = []
     avgVelocity = None
@@ -112,6 +129,15 @@ def updatedPoints(lastPts, thisPts):
         else:
             newPts.append(thisPt)
     return newPts
+
+
+def updatedPlayerPoints(lastPts, thisPts):
+    print "=== # Updating player points # ===="
+    # lastPts should be 5
+    assert len(lastPts) == 5
+
+    # First get the 5 points that are closest to our existing points
+    thisPts = getClosestPts(lastPts, thisPts)
 
 
 
@@ -256,6 +282,44 @@ class Engine:
             cv2.waitKey(20)
         out.release()
 
+
+    def smoothAwayCentroids(self):
+        if self._verbose:
+            print "Smoothing away centroids"
+        frameObjects = self.getFrameObjects()
+
+        # find first instance where two consecutive frames have only 5 away players
+        lastFrameObject = frameObjects[0]
+        firstValidIdx = 0
+        for i, frameObject in enumerate(frameObjects[1:]):
+            if len(frameObject.getAwayMaskCentroids()) and len(lastFrameObject.getAwayMaskCentroids()):
+                firstValidIdx = i
+                break
+            else:
+                lastFrameObject = frameObject
+
+        if self._verbose:
+            print "First valid index: {}".format(firstValidIdx)
+
+        # Reversing
+        if self._verbose:
+            print "Filling in the court points backwards until the first index"
+        nextFrameObject = frameObjects[firstValidIdx]
+        for i, frameObject in reversed(list(enumerate(frameObjects[:firstValidIdx]))):
+            newPts = updatedPlayerPoints(nextFrameObject.getQuadranglePoints(), frameObject.getQuadranglePoints())
+            frameObject.setQuadranglePts(newPts)
+            nextFrameObject = frameObject
+
+        for i, frameObject in enumerate(frameObjects[firstValidIdx:]):
+            newPts = updatedPlayerPoints(lastFrameObject.getQuadranglePoints(), frameObject.getQuadranglePoints())
+            print "New points: {}".format(newPts)
+            frameObject.setQuadranglePts(newPts)
+            lastFrameObject = frameObject
+
+
+
+
+"""
     # This doesn't work
     def getAwayTrackers(self):
         if self._verbose:
@@ -287,9 +351,9 @@ class Engine:
                     tracker.drawOnFrame(frame)
             cv2.imshow('away trajectory', frame)
             cv2.waitKey(20)
+"""
 
     def fillQuadranglePoints(self):
-        self.testFunction()
         if self._verbose:
             print "Filling quadrangle points with velocity estimates"
         frameObjects = self.getFrameObjects()
@@ -306,41 +370,26 @@ class Engine:
         if self._verbose:
             print "First valid index: {}".format(firstValidIdx)
 
-        for i, frameObject in enumerate(frameObjects[firstValidIdx:]):
-            newPts = updatedPoints(lastFrameObject.getQuadranglePoints(), frameObject.getQuadranglePoints())
 
-            """
-            avgVelocity = getAverageVelocity(lastFrameObject, frameObject)
-            print "avgVelocity = {}".format(avgVelocity)
-            newPts = []
-            newPts = [(oldPt[0] + avgVelocity[0],oldPt[1] + avgVelocity[1]) for oldPt in lastFrameObject.getQuadranglePoints()]
+        # Reversing
+        if self._verbose:
+            print "Filling in the court points backwards until the first index"
+        nextFrameObject = frameObjects[firstValidIdx]
+        for i, frameObject in reversed(list(enumerate(frameObjects[:firstValidIdx]))):
+            newPts = updatedCourtPoints(nextFrameObject.getQuadranglePoints(), frameObject.getQuadranglePoints())
             frameObject.setQuadranglePts(newPts)
-            # TODO - do something if the average velocity is over some threshold
-            """
+            nextFrameObject = frameObject
+
+        for i, frameObject in enumerate(frameObjects[firstValidIdx:]):
+            newPts = updatedCourtPoints(lastFrameObject.getQuadranglePoints(), frameObject.getQuadranglePoints())
             print "New points: {}".format(newPts)
             frameObject.setQuadranglePts(newPts)
             lastFrameObject = frameObject
-
-    def testFunction(self):
-        if self._verbose:
-            print "Finding first index for glitch"
-        frameObjects = self.getFrameObjects()
-        idx = 0
-        for i, frameObject in enumerate(frameObjects):
-            if len(frameObject.getQuadranglePoints()) != 4:
-                idx = i
-        print idx
-
-        raw_input()
-
 
     
     def fillQuadranglePointsWithTrajectories(self):
         # Fills in the quadrangle points for all of the frame objects in case it doesn't exist already
         # It uses the panning trajectories to do this
-
-
-
         if self._verbose:
             print "Setting quadrangle points"
         frameObjects = self.getFrameObjects()
@@ -374,8 +423,8 @@ class Engine:
         # Go in reverse and adjust the locations using panning
         for i, frameObject in reversed(list(enumerate(frameObjects[:firstValidIdx]))):
             trajectory = trajectories.loc[i]
-            updatedPoints = [[component - dcomponent for component,dcomponent in zip(pt, trajectory)]  for pt in lastPoints] 
-            frameObject.setQuadranglePts(updatedPoints)
+            updatedCourtPoints = [[component - dcomponent for component,dcomponent in zip(pt, trajectory)]  for pt in lastPoints] 
+            frameObject.setQuadranglePts(updatedCourtPoints)
             allPts[i] = frameObject.getQuadranglePoints()
 
         # Go forward and update based on trajectory
@@ -383,8 +432,8 @@ class Engine:
         for i, frameObject in enumerate(frameObjects[firstValidIdx:]):
             if allPts[i] is None or frameObject.getQuadranglePoints() is None:
                 trajectory = trajectories.loc[i]
-                updatedPoints = [[component + dcomponent for component,dcomponent in zip(pt, trajectory)]  for pt in lastPoints] 
-                frameObject.setQuadranglePts(updatedPoints)
+                updatedCourtPoints = [[component + dcomponent for component,dcomponent in zip(pt, trajectory)]  for pt in lastPoints] 
+                frameObject.setQuadranglePts(updatedCourtPoints)
                 allPts[i] = frameObject.getQuadranglePoints()
             else:
                 lastPoints = frameObject.getQuadranglePoints()
@@ -441,8 +490,8 @@ class Engine:
             # Go in reverse and adjust the locations using panning
             for i, frameObject in reversed(list(enumerate(frameObjects[:firstValidIdx]))):
                 trajectory = trajectories.loc[i]
-                updatedPoints = [[component - dcomponent for component,dcomponent in zip(pt, trajectory)]  for pt in lastPoints] 
-                frameObject.setQuadranglePts(updatedPoints)
+                updatedCourtPoints = [[component - dcomponent for component,dcomponent in zip(pt, trajectory)]  for pt in lastPoints] 
+                frameObject.setQuadranglePts(updatedCourtPoints)
                 homographies[i] = frameObject.getHomography()
 
             # Go forward and update based on trajectory
@@ -450,8 +499,8 @@ class Engine:
             for i, frameObject in enumerate(frameObjects[firstValidIdx:]):
                 if homographies[i] is None or frameObject.getQuadranglePoints() is None:
                     trajectory = trajectories.loc[i]
-                    updatedPoints = [[component + dcomponent for component,dcomponent in zip(pt, trajectory)]  for pt in lastPoints] 
-                    frameObject.setQuadranglePts(updatedPoints)
+                    updatedCourtPoints = [[component + dcomponent for component,dcomponent in zip(pt, trajectory)]  for pt in lastPoints] 
+                    frameObject.setQuadranglePts(updatedCourtPoints)
                     homographies[i] = frameObject.getHomography()
                 else:
                     lastPoints = frameObject.getQuadranglePoints()
