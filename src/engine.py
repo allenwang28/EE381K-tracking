@@ -13,6 +13,8 @@ from panning import Panner
 
 from tracker import Tracker
 
+from homography import NbaCourt as nba
+
 import pickle
 
 import math
@@ -23,7 +25,8 @@ vidDir = os.path.join(fileDir, '..', 'videos')
 dataPath = os.path.join(fileDir, '..', 'data')
 
 #defaultVidPath = os.path.join(vidDir, 'housas-1.mp4')
-defaultVidPath = os.path.join(vidDir, 'gswokc-5.mp4')
+#defaultVidPath = os.path.join(vidDir, 'gswokc-5.mp4')
+defaultVidPath = os.path.join(vidDir, 'gswokc-4.mp4')
 
 # NOTE - this is required because we only found the 
 # ranges for a limited number of teams
@@ -185,6 +188,7 @@ class Engine:
 
     _panningTrajectory = None
     _homographies = None
+    _courtPoints = None
 
     _awayPlayerPositions = None
     _homePlayerPositions = None
@@ -221,13 +225,17 @@ class Engine:
 
         self._panningTrajectoriesPath = os.path.join(dataPath, '{}-traj.p'.format(self._videoTitle))
 
+        self._width = int(self._cap.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
+        self._height = int(self._cap.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
+
+
         self._fourcc = cv2.cv.CV_FOURCC(*'X264')
 
         if verbose:
             print(("#===== Opening {} =====#".format(video)))
             print(("Successful?: {}".format(str(self._cap.isOpened()))))
-            print(("Frame width: {}".format(self._cap.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))))
-            print(("Frame height: {}".format(self._cap.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))))
+            print(("Frame width: {}".format(self._width)))
+            print(("Frame height: {}".format(self._height)))
             print(("FPS: {}".format(str(self._cap.get(cv2.cv.CV_CAP_PROP_FPS)))))
             print(("Frame count: {}".format(self._capLength)))
 
@@ -264,7 +272,7 @@ class Engine:
 
         
         savedVidPath = os.path.join(vidDir, '{}-pts.avi'.format(self._videoTitle))
-        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (1280, 720))
+        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (self._width, self._height))
 
         if self._verbose:
             print "Saving points"
@@ -282,7 +290,7 @@ class Engine:
         frameObjects = self.getFrameObjects()
 
         savedVidPath = os.path.join(vidDir, '{}-homeCentroids.avi'.format(self._videoTitle))
-        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (1280, 720))
+        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (self._width, self._height))
 
         if self._verbose:
             print "Showing home centroids"
@@ -300,7 +308,7 @@ class Engine:
         frameObjects = self.getFrameObjects()
 
         savedVidPath = os.path.join(vidDir, '{}-awayCentroids.avi'.format(self._videoTitle))
-        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (1280, 720))
+        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (self._width, self._height))
 
         if self._verbose:
             print "Showing away centroids"
@@ -318,7 +326,7 @@ class Engine:
         frameObjects = self.getFrameObjects()
 
         savedVidPath = os.path.join(vidDir, '{}-smoothedAwayCentroids.avi'.format(self._videoTitle))
-        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (1280, 720))
+        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (self._width, self._height))
 
         if self._verbose:
             print "Showing smoothed away centroids"
@@ -336,7 +344,7 @@ class Engine:
         frameObjects = self.getFrameObjects()
 
         savedVidPath = os.path.join(vidDir, '{}-smoothedHomeCentroids.avi'.format(self._videoTitle))
-        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (1280, 720))
+        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (self._width, self._height))
 
         if self._verbose:
             print "Showing smoothed home centroids"
@@ -540,7 +548,7 @@ class Engine:
         self.fillQuadranglePoints()
 
         savedVidPath = os.path.join(vidDir, '{}-filledPts.avi'.format(self._videoTitle))
-        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (1280, 720))
+        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (self._width, self._height))
         if self._verbose:
             print "Showing filled quadrangle points"
             print "Saving to {}".format(savedVidPath)
@@ -574,6 +582,14 @@ class Engine:
                 self._homographies.append(frameObject.getHomography())
         return self._homographies
 
+
+    def getCourtPoints(self):
+        if self._courtPoints is None:
+            self._courtPoints = []
+            frameObjects = self.getFrameObjects()
+            for frameObject in frameObjects:
+                self._courtPoints.append(frameObject.getQuadranglePoints())
+        return self._courtPoints
 
     def getAwayTrajectories(self):
         if self._awayTrajectories is None:
@@ -629,29 +645,88 @@ class Engine:
         self.smoothHomeCentroids()
         self.smoothAwayCentroids()
 
-        homographies = self.getHomographies()
-        awayPoints = self.getAwayPlayerPoints()
-        homePoints = self.getHomePlayerPoints()
+        canvasWidth = nba.getWidth()
+        canvasHeight = nba.getHeight()
 
-        adjustedHomePoints = []
-        adjustedAwayPoints = []
+        # To use hstack we need to make the images the same dimensions
+        # Therefore we take the bigger of the two images and pad the other
 
-        for homography, awayPoint, homePoint in zip(homographies, awayPoints, homePoints):
-            awayPoint = np.array([awayPoint], dtype='float32')
-            homePoint = np.array([homePoint], dtype='float32')
-            adjustedAwayPoint = cv2.perspectiveTransform(awayPoint, homography)
-            adjustedHomePoint = cv2.perspectiveTransform(homePoint, homography)
+        adjustedVideoHeight = max(canvasHeight, self._height)
+        joinedWidth = canvasWidth / 2 + self._width
+        joinedHeight = adjustedVideoHeight
 
-            adjustedHomePoints.append(adjustedHomePoint)
-            adjustedAwayPoints.append(adjustedAwayPoint)
+
+        scale_x = 0.75
+        scale_y = 0.75
+
+        savedVidPath = os.path.join(vidDir, '{}-adjusted.avi'.format(self._videoTitle))
+        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (int(joinedWidth*scale_x), int(joinedHeight*scale_y)))
+
+        allHomographies = self.getHomographies()
+        allAwayPoints = self.getAwayPlayerPoints()
+        allHomePoints = self.getHomePlayerPoints()
+        allCourtPoints = self.getCourtPoints()
+
+
+        allAdjustedHomePoints = []
+        allAdjustedAwayPoints = []
+        allAdjustedCourtPoints = []
+
+        awayCircleColor = frameObjects[0].getAwayCircleColor()
+        homeCircleColor = frameObjects[0].getHomeCircleColor()
+
+        for homographies, awayPoints, homePoints, courtPoints in zip(allHomographies, allAwayPoints, allHomePoints, allCourtPoints):
+            awayPoints = np.array([awayPoints], dtype='float32')
+            homePoints = np.array([homePoints], dtype='float32')
+            courtPoints = np.array([courtPoints], dtype='float32')
+
+            adjustedAwayPoints = cv2.perspectiveTransform(awayPoints, homographies)
+            adjustedHomePoints = cv2.perspectiveTransform(homePoints, homographies)
+            adjustedCourtPoints = cv2.perspectiveTransform(courtPoints, homographies)
+
+
+            allAdjustedHomePoints.append(adjustedHomePoints)
+            allAdjustedAwayPoints.append(adjustedAwayPoints)
+            allAdjustedCourtPoints.append(adjustedCourtPoints)
 
             if self._verbose:
-                print "away (before): {}".format(awayPoint)
-                print "home (before): {}".format(homePoint)
-                print "away (after): {}".format(adjustedAwayPoint)
-                print "home (after): {}".format(adjustedHomePoint)
+                print "away (before): {}".format(awayPoints)
+                print "home (before): {}".format(homePoints)
+                print "away (after): {}".format(adjustedAwayPoints)
+                print "home (after): {}".format(adjustedHomePoints)
 
+        #blank = np.zeros([canvasWidth, canvasHeight, 3], np.uint8)
+        blank = np.zeros([canvasHeight, canvasWidth, 3], np.uint8)
 
+        assert len(allAdjustedHomePoints) == len(allAdjustedAwayPoints)
+
+        for adjustedHomePts, adjustedAwayPts, frameObject, courtPts in zip(allAdjustedHomePoints, allAdjustedAwayPoints, frameObjects, allAdjustedCourtPoints):
+            assert len(adjustedHomePts) == len(adjustedAwayPts)
+
+            canvas = blank.copy()
+            for (x_away, y_away), (x_home, y_home) in zip(adjustedAwayPts[0], adjustedHomePts[0]):
+                circs = cv2.circle(canvas, (int(x_away + 200), int(y_away + 200)), 5, homeCircleColor, -1)
+                circs = cv2.circle(canvas, (int(x_home + 200), int(y_home + 200)), 5, awayCircleColor, -1)
+            for (x, y) in courtPts[0]:
+                circs = cv2.circle(canvas, (int(x + 200), int(y + 200)), 5, colors.BGR_RED)
+
+            origImg = frameObject.drawPoints()
+            origImg = frameObject.drawAwayMaskCentroids(origImg)
+            origImg = frameObject.drawHomeMaskCentroids(origImg)
+
+            # Combine the images
+            joined = np.zeros([joinedHeight, joinedWidth, 3], np.uint8)
+
+            joined[:self._height, :self._width] = origImg
+            if self._side == 'left':
+                joined[:canvasHeight, self._width:self._width + canvasWidth / 2] = canvas[:,:canvasWidth / 2]
+            else:
+                joined[:canvasHeight, self._width:self._width + canvasWidth / 2] = canvas[:,canvasWidth / 2:]
+            joined = cv2.resize(joined, (0,0), fx = scale_x, fy = scale_y)
+            cv2.imshow('adjusted', joined)
+            out.write(joined)
+            cv2.waitKey(20)
+        out.release()
 
 
     def show(self):
@@ -757,7 +832,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--side', type=str,
                         help="Side of the court",
-                        default='left')
+                        default='right')
 
     parser.add_argument('--home', type=str,
                         help="Home team",

@@ -25,6 +25,45 @@ class NbaCourt:
     LOCATIONS = ['sideline, freethrow', 'sideline, baseline',
         'closepaint, baseline', 'closepaint, freethrow']
 
+    WIDTH = 1200
+    HEIGHT = 1067
+
+    @classmethod
+    def getWidth(self):
+        return self.WIDTH
+
+    @classmethod
+    def getHeight(self):
+        return self.HEIGHT
+
+    @classmethod
+    def get_loc_coords(this, loc, side):
+        if side == 'left':
+            if loc == this.SIDELINE_FREETHROW:
+                return (0, 0)
+            elif loc == this.SIDELINE_BASELINE:
+                return (18*12 + 10, 0)
+            elif loc == this.CLOSEPAINT_BASELINE:
+                return (18*12 + 10, 33*12)
+            elif loc == this.CLOSEPAINT_FREETHROW:
+                return (0, 33*12)
+            else:
+                raise Exception('loc not recognized')
+        elif side == 'right':
+            if loc == this.SIDELINE_FREETHROW:
+                return (94*12 - (18*12 + 10), 0)
+            elif loc == this.SIDELINE_BASELINE:
+                return (94*12 - (0), 0)
+            elif loc == this.CLOSEPAINT_BASELINE:
+                return (94*12 - (0), 33*12)
+            elif loc == this.CLOSEPAINT_FREETHROW:
+                return (94*12 - (18*12 + 10), 33*12)
+            else:
+                raise Exception('loc not recognized')
+        else:
+            raise Exception('Side must be "left" or "right".')
+ 
+    """
     @classmethod
     def get_loc_coords(this, loc, side):
         if side == 'left':
@@ -51,7 +90,7 @@ class NbaCourt:
                 raise Exception('loc not recognized')
         else:
             raise Exception('Side must be "left" or "right".')
-
+    """
 
 def compute_homography(image_pts, side):
     a = np.zeros((12,8))

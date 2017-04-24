@@ -62,6 +62,9 @@ class FrameObject():
 
     _verbose = True
 
+    _homeCircleColor = None
+    _awayCircleColor = None
+
     def __init__(self, img, frameNum, videoTitle, awayColors, homeColors, side, verbose = True):
         assert img is not None
         if side not in ['left', 'right']:
@@ -292,13 +295,25 @@ class FrameObject():
         hough.put_points_on_img(img, points)
         return img
 
+    def getHomeCircleColor(self): 
+        if self._homeCircleColor is None:
+            self._homeCircleColor = colors.hsv_to_bgr_color(self._homeColors[1])
+        return self._homeCircleColor
+
+    def getAwayCircleColor(self): 
+        if self._awayCircleColor is None:
+            self._awayCircleColor = colors.hsv_to_bgr_color(self._awayColors[1])
+        return self._awayCircleColor
+
+
     def drawAwayMaskCentroids(self, img=None):
         if img is None:
             img = self.drawInfo()
         coordinates = self.getAwayMaskCentroids()
 
-        circleColor = colors.hsv_to_bgr_color(self._homeColors[1])
-        #circleColor = colors.hsv_to_bgr_color(self._awayColors[0])
+        circleColor = self.getHomeCircleColor()
+        #circleColor = colors.hsv_to_bgr_color(self._homeColors[1])
+
         for (x,y) in coordinates:
             circs = cv2.circle(img, (x,y), 5, circleColor, -1)
         return img
@@ -307,8 +322,8 @@ class FrameObject():
         if img is None:
             img = self.drawInfo()
         coordinates = self.getHomeMaskCentroids()
-        circleColor = colors.hsv_to_bgr_color(self._awayColors[1])
-        #circleColor = colors.hsv_to_bgr_color(self._homeColors[0])
+
+        circleColor = self.getAwayCircleColor()
         for (x,y) in coordinates:
             circs = cv2.circle(img, (x,y), 5, circleColor, -1)
         return img
