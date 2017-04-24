@@ -14,6 +14,10 @@ import cluster
 import homography
 from homography import NbaCourt as nba
 
+def draw_str(dst, (x, y), s):
+    cv2.putText(dst, s, (x+1, y+1), cv2.FONT_HERSHEY_PLAIN, 1.0, (0, 0, 0), thickness = 2, lineType=cv2.CV_AA)
+    cv2.putText(dst, s, (x, y), cv2.FONT_HERSHEY_PLAIN, 1.0, (255, 255, 255), lineType=cv2.CV_AA)
+
 class FrameObject():
     # Variables
     _frameNum = None
@@ -190,6 +194,12 @@ class FrameObject():
             self._awayMaskCentroids = colors.remap_from_crowdless_coords(self.getBgrImg(), self._awayMaskCentroids)
         return self._awayMaskCentroids
 
+    def setAwayMaskCentroids(self, awayMaskCentroids):
+       self._awayMaskCentroids = awayMaskCentroids
+
+    def setHomeMaskCentroids(self, homeMaskCentroids):
+       self._homeMaskCentroids = homeMaskCentroids
+
     def getHomeMaskCentroids(self):
         if self._homeMaskCentroids is None:
             self._homeMaskCentroids = cluster.getCentroids(self.getHomeJerseyMask())
@@ -252,9 +262,16 @@ class FrameObject():
         self.getAwayMaskCentroids()
         self.getHomeMaskCentroids()
 
-    def drawLines(self, img=None):
+    def drawInfo(self, img=None):
         if img is None:
             img = self.getBgrImg()
+        draw_str(img, (0,20), "Video Title: {}".format(self._videoTitle))
+        draw_str(img, (0,50), "Frame {}".format(self._frameNum))
+        return img
+
+    def drawLines(self, img=None):
+        if img is None:
+            img = self.drawInfo()
         lines = [self.getFreethrowline(), self.getClosepaintline(),
             self.getSideline(), self.getBaseline()]
         if not self.allLinesDetected():
@@ -268,7 +285,7 @@ class FrameObject():
 
     def drawPoints(self, img=None):
         if img is None:
-            img = self.getBgrImg()
+            img = self.drawInfo()
         points = self.getQuadranglePoints()
         # Draw the points we were able to detect
         points = [point for point in points if point is not None]
@@ -277,7 +294,7 @@ class FrameObject():
 
     def drawAwayMaskCentroids(self, img=None):
         if img is None:
-            img = self.getBgrImg()
+            img = self.drawInfo()
         coordinates = self.getAwayMaskCentroids()
 
         circleColor = colors.hsv_to_bgr_color(self._homeColors[1])
@@ -288,7 +305,7 @@ class FrameObject():
 
     def drawHomeMaskCentroids(self, img=None):
         if img is None:
-            img = self.getBgrImg()
+            img = self.drawInfo()
         coordinates = self.getHomeMaskCentroids()
         circleColor = colors.hsv_to_bgr_color(self._awayColors[1])
         #circleColor = colors.hsv_to_bgr_color(self._homeColors[0])
@@ -297,7 +314,7 @@ class FrameObject():
         return img
 
     def showFrame(self):
-        cv2.imshow('frame', self.getBgrImg())
+        cv2.imshow('frame', self.drawInfo())
 
     def showLines(self):
         cv2.imshow('lines', self.drawLines())

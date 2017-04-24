@@ -75,25 +75,27 @@ def getAllVelocities(last, this):
 def dist(a, b):
     return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
 
-def getClosestPts(lastPts, thisPts):
+def getClosestPlayerPts(lastPts, thisPts, thresh = 50):
     newPts = []
 
     for lastPt in lastPts:
-        minDist = 10000000000
+        # Setting minDist to thresh means that if the point moves more than thresh
+        # Euclidean pixels then we won't count that as the closest point
+        minDist = thresh
         closestPt = None
         for thisPt in thisPts:
             distance = dist(lastPt, thisPt)
             if distance < minDist:
                 minDist = distance
                 closestPt = thisPt
-            if closestPt is not None:
-                thisPts.remove(closestPt)
+        if closestPt is not None:
+            thisPts.remove(closestPt)
         newPts.append(closestPt)    
     return newPts 
 
 
 def updatedCourtPoints(lastPts, thisPts):
-    print "=== # Getting average velocity # ==="
+    #print "=== # Getting average velocity # ==="
     assert len(lastPts) == len(thisPts)
     xVelocities = []
     yVelocities = []
@@ -101,7 +103,7 @@ def updatedCourtPoints(lastPts, thisPts):
 
     # First calculate the average velocity
     for lastPt, thisPt in zip(lastPts, thisPts):
-        print "lastPt: {}, thisPt: {}".format(lastPt, thisPt)
+        #print "lastPt: {}, thisPt: {}".format(lastPt, thisPt)
         if lastPt is None or thisPt is None:
             continue
         else:
@@ -113,7 +115,7 @@ def updatedCourtPoints(lastPts, thisPts):
         avgVelocity = [0,0]
     else:
         avgVelocity = [sum(xVelocities) / len(xVelocities), sum(yVelocities) / len(yVelocities)]
-    print "Average velocity: {}".format(avgVelocity)
+    #print "Average velocity: {}".format(avgVelocity)
     if abs(avgVelocity[0]) > 10:
         avgVelocity[0] = (avgVelocity[0] / abs(avgVelocity[0])) * 2
     if abs(avgVelocity[1]) > 10:
@@ -128,17 +130,37 @@ def updatedCourtPoints(lastPts, thisPts):
             newPts.append((lastPt[0] + avgVelocity[0], lastPt[1] + avgVelocity[1]))
         else:
             newPts.append(thisPt)
-    return newPts
+    return avgVelocity, newPts
+
+def getLikelyPlayerPoints(points, center = (900, 600)):
+    # The most likely players are going to be closest to the center of the image.
+    # Therefore we'll get the 5 closest points to the center
+    print "Testing likely player points"
+    print points
+    points.sort(key=lambda pt: dist(pt, center), reverse=False)
+    print points
+    return points[:5]
 
 
-def updatedPlayerPoints(lastPts, thisPts):
-    print "=== # Updating player points # ===="
-    # lastPts should be 5
-    assert len(lastPts) == 5
+def updatedPlayerPoints(lastPts, thisPts, avgVelocity, thresh = 60):
+    # lastPts should be at least 5
+    assert len(lastPts) >= 5
+
+    if len(lastPts) > 5:
+        lastPts = getLikelyPlayerPoints(lastPts)
 
     # First get the 5 points that are closest to our existing points
-    thisPts = getClosestPts(lastPts, thisPts)
+    thisPts = getClosestPlayerPts(lastPts, thisPts, thresh)
 
+    newPts = []
+
+    for lastPt, thisPt in zip(lastPts, thisPts):
+        if thisPt is None:
+            newPt = (lastPt[0] + avgVelocity[0], lastPt[1] + avgVelocity[1])
+            newPts.append(lastPt)
+        else: 
+            newPts.append(thisPt)
+    return newPts
 
 
 class Engine:
@@ -163,6 +185,10 @@ class Engine:
 
     _panningTrajectory = None
     _homographies = None
+
+    _awayPlayerPositions = None
+    _homePlayerPositions = None
+
     _homeTrajectories = None
     _awayTrajectories = None
 
@@ -170,6 +196,7 @@ class Engine:
     _panningTrajectoriesPath = None
 
     _trackers = None
+    _avgVelocities = None
 
 
     def __init__(self, video, awayTeam, homeTeam, side, verbose = True):
@@ -187,7 +214,11 @@ class Engine:
         self._cap = cv2.VideoCapture(video)
         self._capLength = int(self._cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
         self._videoTitle = os.path.splitext(os.path.basename(video))[0]
+
         self._frameObjectsPath = os.path.join(dataPath, '{}-frames.p'.format(self._videoTitle))
+        self._filledPtsPath = os.path.join(dataPath, '{}-filledPts.p'.format(self._videoTitle))
+        self._avgVelocitiesPath = os.path.join(dataPath, '{}-avgVelocities.p'.format(self._videoTitle))
+
         self._panningTrajectoriesPath = os.path.join(dataPath, '{}-traj.p'.format(self._videoTitle))
 
         self._fourcc = cv2.cv.CV_FOURCC(*'X264')
@@ -282,76 +313,122 @@ class Engine:
             cv2.waitKey(20)
         out.release()
 
-
-    def smoothAwayCentroids(self):
-        if self._verbose:
-            print "Smoothing away centroids"
+    def showSmoothedAwayCentroids(self):
+        self.smoothAwayCentroids()
         frameObjects = self.getFrameObjects()
 
-        # find first instance where two consecutive frames have only 5 away players
-        lastFrameObject = frameObjects[0]
-        firstValidIdx = 0
-        for i, frameObject in enumerate(frameObjects[1:]):
-            if len(frameObject.getAwayMaskCentroids()) and len(lastFrameObject.getAwayMaskCentroids()):
-                firstValidIdx = i
+        savedVidPath = os.path.join(vidDir, '{}-smoothedAwayCentroids.avi'.format(self._videoTitle))
+        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (1280, 720))
+
+        if self._verbose:
+            print "Showing smoothed away centroids"
+            print "Saving to {}".format(savedVidPath)
+
+        for frameObject in frameObjects:
+            img = frameObject.drawAwayMaskCentroids()
+            out.write(img)
+            cv2.imshow('smoothed away centroids', img)
+            cv2.waitKey(20)
+        out.release()
+
+    def showSmoothedHomeCentroids(self):
+        self.smoothHomeCentroids()
+        frameObjects = self.getFrameObjects()
+
+        savedVidPath = os.path.join(vidDir, '{}-smoothedHomeCentroids.avi'.format(self._videoTitle))
+        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (1280, 720))
+
+        if self._verbose:
+            print "Showing smoothed home centroids"
+            print "Saving to {}".format(savedVidPath)
+
+        for frameObject in frameObjects:
+            img = frameObject.drawHomeMaskCentroids()
+            out.write(img)
+            cv2.imshow('smoothed home centroids', img)
+            cv2.waitKey(20)
+        out.release()
+
+    def smoothHomeCentroids(self):
+        if self._verbose:
+            print "Smoothing home centroids"
+        frameObjects = self.getFrameObjects()
+        avgVelocities = self.getAverageVelocities()
+
+        print avgVelocities
+
+        # find first instance where two consecutive frames have at least 5 home players
+        firstValidIdx = 87
+        lastFrameObject = frameObjects[firstValidIdx]
+        for i, frameObject in enumerate(frameObjects[firstValidIdx + 1:]):
+            if len(frameObject.getHomeMaskCentroids()) >= 5 and len(lastFrameObject.getHomeMaskCentroids()) >= 5:
+                firstValidIdx = i + firstValidIdx
+                lastFrameObject = frameObject
                 break
             else:
                 lastFrameObject = frameObject
 
         if self._verbose:
             print "First valid index: {}".format(firstValidIdx)
+            print "Filling in the home player points backwards until the first index"
 
-        # Reversing
-        if self._verbose:
-            print "Filling in the court points backwards until the first index"
         nextFrameObject = frameObjects[firstValidIdx]
-        for i, frameObject in reversed(list(enumerate(frameObjects[:firstValidIdx]))):
-            newPts = updatedPlayerPoints(nextFrameObject.getQuadranglePoints(), frameObject.getQuadranglePoints())
-            frameObject.setQuadranglePts(newPts)
+
+        for frameObject, avgVelocity in reversed(list(zip(frameObjects[:firstValidIdx], avgVelocities[:firstValidIdx]))):
+            newPts = updatedPlayerPoints(nextFrameObject.getHomeMaskCentroids(),
+                                                         frameObject.getHomeMaskCentroids(),
+                                                         avgVelocity)
+            frameObject.setHomeMaskCentroids(newPts)
             nextFrameObject = frameObject
 
-        for i, frameObject in enumerate(frameObjects[firstValidIdx:]):
-            newPts = updatedPlayerPoints(lastFrameObject.getQuadranglePoints(), frameObject.getQuadranglePoints())
-            print "New points: {}".format(newPts)
-            frameObject.setQuadranglePts(newPts)
+        lastVelocities = [0, 0, 0, 0, 0]
+        for frameObject, avgVelocity in zip(frameObjects[firstValidIdx:], avgVelocities[firstValidIdx:]):
+            newPts = updatedPlayerPoints(lastFrameObject.getHomeMaskCentroids(),
+                                                         frameObject.getHomeMaskCentroids(),
+                                                         avgVelocity)
+            frameObject.setHomeMaskCentroids(newPts)
             lastFrameObject = frameObject
 
 
 
-
-"""
-    # This doesn't work
-    def getAwayTrackers(self):
+    def smoothAwayCentroids(self):
         if self._verbose:
-            print "Setting away trackers"
+            print "Smoothing away centroids"
         frameObjects = self.getFrameObjects()
+        avgVelocities = self.getAverageVelocities()
 
-        firstValidIdx = 0
-        centroids = None
-        # Look for the first frame object with only 5 jerseys detected 
-        for i, frameObject in enumerate(frameObjects):
-            if len(frameObject.getAwayMaskCentroids()) == 5:
-                firstValidIdx = i 
-                centroids = frameObject.getAwayMaskCentroids()
-        if centroids is None:
-            raise Exception("No valid away centroids detected")
-        self._awayTrackers = []
+        print avgVelocities
 
-        for centroid in centroids:
-            self._awayTrackers.append(Tracker(frameObjects[firstValidIdx].getBgrImg(),
-                                              centroid[0],
-                                              5,
-                                              centroid[1],
-                                              5))
+        # find first instance where two consecutive frames have at least 5 away players
+        firstValidIdx = 31
+        lastFrameObject = frameObjects[firstValidIdx]
+        for i, frameObject in enumerate(frameObjects[firstValidIdx + 1:]):
+            if len(frameObject.getAwayMaskCentroids()) >= 5 and len(lastFrameObject.getAwayMaskCentroids()) >= 5:
+                firstValidIdx = i + firstValidIdx
+                lastFrameObject = frameObject
+                break
+            else:
+                lastFrameObject = frameObject
 
-        for frameObject in frameObjects[firstValidIdx:]:
-            frame = frameObject.getBgrImg()
-            for tracker in self._awayTrackers:
-                if tracker.isLive():
-                    tracker.drawOnFrame(frame)
-            cv2.imshow('away trajectory', frame)
-            cv2.waitKey(20)
-"""
+        if self._verbose:
+            print "First valid index: {}".format(firstValidIdx)
+            print "Filling in the away player points backwards until the first index"
+
+        nextFrameObject = frameObjects[firstValidIdx]
+
+        for frameObject, avgVelocity in reversed(list(zip(frameObjects[:firstValidIdx], avgVelocities[:firstValidIdx]))):
+            newPts = updatedPlayerPoints(nextFrameObject.getAwayMaskCentroids(),
+                                                         frameObject.getAwayMaskCentroids(),
+                                                         avgVelocity)
+            frameObject.setAwayMaskCentroids(newPts)
+            nextFrameObject = frameObject
+
+        for frameObject, avgVelocity in zip(frameObjects[firstValidIdx:], avgVelocities[firstValidIdx:]):
+            newPts = updatedPlayerPoints(lastFrameObject.getAwayMaskCentroids(),
+                                                         frameObject.getAwayMaskCentroids(),
+                                                         avgVelocity)
+            frameObject.setAwayMaskCentroids(newPts)
+            lastFrameObject = frameObject
 
     def fillQuadranglePoints(self):
         if self._verbose:
@@ -359,11 +436,11 @@ class Engine:
         frameObjects = self.getFrameObjects()
 
         # find the first instance where two consecutive frames have all points
-        lastFrameObject = frameObjects[0]
         firstValidIdx = 0
-        for i, frameObject in enumerate(frameObjects[1:]):
+        lastFrameObject = frameObjects[firstValidIdx]
+        for i, frameObject in enumerate(frameObjects[firstValidIdx + 1:]):
             if frameObject.allLinesDetected() and lastFrameObject.allLinesDetected():
-                firstValidIdx = i
+                firstValidIdx = i + firstValidIdx
                 break
             else:
                 lastFrameObject = frameObject
@@ -375,18 +452,39 @@ class Engine:
         if self._verbose:
             print "Filling in the court points backwards until the first index"
         nextFrameObject = frameObjects[firstValidIdx]
+
+        self._avgVelocities = []
+
         for i, frameObject in reversed(list(enumerate(frameObjects[:firstValidIdx]))):
-            newPts = updatedCourtPoints(nextFrameObject.getQuadranglePoints(), frameObject.getQuadranglePoints())
+            avgVelocity, newPts = updatedCourtPoints(nextFrameObject.getQuadranglePoints(), frameObject.getQuadranglePoints())
             frameObject.setQuadranglePts(newPts)
             nextFrameObject = frameObject
+            self._avgVelocities.append(avgVelocity)
+    
+        self._avgVelocities.reverse()
+
+        if self._verbose:
+            print "Filling in the court point forwards now"
 
         for i, frameObject in enumerate(frameObjects[firstValidIdx:]):
-            newPts = updatedCourtPoints(lastFrameObject.getQuadranglePoints(), frameObject.getQuadranglePoints())
-            print "New points: {}".format(newPts)
+            avgVelocity, newPts = updatedCourtPoints(lastFrameObject.getQuadranglePoints(), frameObject.getQuadranglePoints())
             frameObject.setQuadranglePts(newPts)
             lastFrameObject = frameObject
+            self._avgVelocities.append(avgVelocity)
+        pickle.dump(self._avgVelocities, open(self._avgVelocitiesPath, "wb"))
+        if self._verbose:
+            print "Saving average velocities pickle file to {}".format(self._avgVelocitiesPath)
 
-    
+    def getAverageVelocities(self):
+        if self._avgVelocities is None:
+            if os.path.isfile(self._avgVelocitiesPath):
+                self._avgVelocities = pickle.load(open(self._avgVelocitiesPath, "rb"))
+                if self._verbose:
+                    print "Opening average velocities pickle file from {}".format(self._avgVelocitiesPath)
+            else:
+                self.fillQuadranglePoints()
+        return self._avgVelocities
+
     def fillQuadranglePointsWithTrajectories(self):
         # Fills in the quadrangle points for all of the frame objects in case it doesn't exist already
         # It uses the panning trajectories to do this
@@ -454,58 +552,26 @@ class Engine:
             cv2.waitKey(20)
         out.release()
 
+    def getAwayPlayerPoints(self):
+        if self._awayPlayerPositions is None:
+            self._awayPlayerPositions = []
+            for frameObject in self.getFrameObjects():
+                self._awayPlayerPositions.append(frameObject.getAwayMaskCentroids()) 
+        return self._awayPlayerPositions
+
+    def getHomePlayerPoints(self):
+        if self._homePlayerPositions is None:
+            self._homePlayerPositions = []
+            for frameObject in self.getFrameObjects():
+                self._homePlayerPositions.append(frameObject.getHomeMaskCentroids()) 
+        return self._homePlayerPositions
+
     def getHomographies(self):
         if self._homographies is None:
-            if self._verbose:
-                print "Calculating homographies"
+            self._homographies = []
             frameObjects = self.getFrameObjects()
-            trajectories = self.getPanningTrajectory()
-            # Get all possible homographies
-            homographies = []
             for frameObject in frameObjects:
-                h = frameObject.getHomography()
-                homographies.append(h)
-            # Fill in the nones with previous homographies adjusted by the panning
-
-            # Note - index of trajectory i is the trajectory from frame i to i+1
-            # e.g. trajectory[0]  is the trajectory from 0 to 1`
-            
-            # Algorithm:
-            # 1. Find the first valid homography in the list
-            # 2. Calculate the new quadrangle coordinates with a transform 
-            #    of the last known homography (going in reverse)
-            # 3. Set the updated points in the frame, calculate homography 
-            # 4. Repeat steps 2 and 3 except forward until there are no more nones in the list
-            firstValidIdx = notNoneIdx(homographies)
-
-            if self._verbose:
-                print "First valid index was: {}".format(firstValidIdx)
-            
-            lastFrameObject = frameObjects[firstValidIdx]
-            lastPoints = lastFrameObject.getQuadranglePoints()
-
-            if self._verbose:
-                print "Updating homographies backwards..."
-
-            # Go in reverse and adjust the locations using panning
-            for i, frameObject in reversed(list(enumerate(frameObjects[:firstValidIdx]))):
-                trajectory = trajectories.loc[i]
-                updatedCourtPoints = [[component - dcomponent for component,dcomponent in zip(pt, trajectory)]  for pt in lastPoints] 
-                frameObject.setQuadranglePts(updatedCourtPoints)
-                homographies[i] = frameObject.getHomography()
-
-            # Go forward and update based on trajectory
-            lastPoints = frameObject.getQuadranglePoints()
-            for i, frameObject in enumerate(frameObjects[firstValidIdx:]):
-                if homographies[i] is None or frameObject.getQuadranglePoints() is None:
-                    trajectory = trajectories.loc[i]
-                    updatedCourtPoints = [[component + dcomponent for component,dcomponent in zip(pt, trajectory)]  for pt in lastPoints] 
-                    frameObject.setQuadranglePts(updatedCourtPoints)
-                    homographies[i] = frameObject.getHomography()
-                else:
-                    lastPoints = frameObject.getQuadranglePoints()
-            self._homographies = homographies 
-            print homographies
+                self._homographies.append(frameObject.getHomography())
         return self._homographies
 
 
@@ -554,6 +620,40 @@ class Engine:
                     print "Saving fo pickle file to {}".format(self._frameObjectsPath)
         return self._frameObjects
 
+
+    def showAdjustedPoints(self):
+        if self._verbose:
+            print "Adjusting the points with homography"
+        frameObjects = self.getFrameObjects()
+        self.fillQuadranglePoints()
+        self.smoothHomeCentroids()
+        self.smoothAwayCentroids()
+
+        homographies = self.getHomographies()
+        awayPoints = self.getAwayPlayerPoints()
+        homePoints = self.getHomePlayerPoints()
+
+        adjustedHomePoints = []
+        adjustedAwayPoints = []
+
+        for homography, awayPoint, homePoint in zip(homographies, awayPoints, homePoints):
+            awayPoint = np.array([awayPoint], dtype='float32')
+            homePoint = np.array([homePoint], dtype='float32')
+            adjustedAwayPoint = cv2.perspectiveTransform(awayPoint, homography)
+            adjustedHomePoint = cv2.perspectiveTransform(homePoint, homography)
+
+            adjustedHomePoints.append(adjustedHomePoint)
+            adjustedAwayPoints.append(adjustedAwayPoint)
+
+            if self._verbose:
+                print "away (before): {}".format(awayPoint)
+                print "home (before): {}".format(homePoint)
+                print "away (after): {}".format(adjustedAwayPoint)
+                print "home (after): {}".format(adjustedHomePoint)
+
+
+
+
     def show(self):
         self.fillQuadranglePoints()
         frameObjects = self.getFrameObjects()
@@ -573,6 +673,12 @@ def testEngineMain(args):
             engine.showPoints()
         if args.courtFilled:
             engine.showFilledPoints()
+        if args.smoothedAwayPoints:
+            engine.showSmoothedAwayCentroids()
+        if args.smoothedHomePoints:
+            engine.showSmoothedHomeCentroids()
+        if args.adjusted:
+            engine.showAdjustedPoints()
     engine.destroy()
 
 def main(args):
@@ -672,6 +778,15 @@ if __name__ == "__main__":
 
     showParser.add_argument('--courtFilled', action='store_true',
                              help='Show the court points adjusted with panning')
+
+    showParser.add_argument('--smoothedAwayPoints', action='store_true',
+                             help='Show away mask centroids')
+
+    showParser.add_argument('--smoothedHomePoints', action='store_true',
+                             help='Show home mask centroids')
+
+    showParser.add_argument('--adjusted', action='store_true',
+                             help='Show all points adjusted')
 
     args = parser.parse_args()
 
