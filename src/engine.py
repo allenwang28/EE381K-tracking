@@ -24,9 +24,9 @@ fileDir = os.path.dirname(os.path.realpath(__file__))
 vidDir = os.path.join(fileDir, '..', 'videos')
 dataPath = os.path.join(fileDir, '..', 'data')
 
-#defaultVidPath = os.path.join(vidDir, 'housas-1.mp4')
+defaultVidPath = os.path.join(vidDir, 'housas-1.mp4')
 #defaultVidPath = os.path.join(vidDir, 'gswokc-5.mp4')
-defaultVidPath = os.path.join(vidDir, 'gswokc-4.mp4')
+#defaultVidPath = os.path.join(vidDir, 'gswokc-4.mp4')
 
 # NOTE - this is required because we only found the 
 # ranges for a limited number of teams
@@ -135,7 +135,8 @@ def updatedCourtPoints(lastPts, thisPts):
             newPts.append(thisPt)
     return avgVelocity, newPts
 
-def getLikelyPlayerPoints(points, center = (900, 600)):
+# center = (640, 720) # gswokc-1
+def getLikelyPlayerPoints(points, center = (800, 200)):
     # The most likely players are going to be closest to the center of the image.
     # Therefore we'll get the 5 closest points to the center
     print "Testing likely player points"
@@ -159,8 +160,8 @@ def updatedPlayerPoints(lastPts, thisPts, avgVelocity, thresh = 60):
 
     for lastPt, thisPt in zip(lastPts, thisPts):
         if thisPt is None:
-            newPt = (lastPt[0] + avgVelocity[0], lastPt[1] + avgVelocity[1])
-            newPts.append(lastPt)
+            newPt = (int(lastPt[0] + avgVelocity[0]), int(lastPt[1] + avgVelocity[1]))
+            newPts.append(newPt)
         else: 
             newPts.append(thisPt)
     return newPts
@@ -366,7 +367,10 @@ class Engine:
         print avgVelocities
 
         # find first instance where two consecutive frames have at least 5 home players
-        firstValidIdx = 87
+        #firstValidIdx = 87 # gswokc-5
+        #firstValidIdx = 19 # gswokc-1
+        #firstValidIdx = 28 # gswokc-4
+        firstValidIdx = 0 # housas-1
         lastFrameObject = frameObjects[firstValidIdx]
         for i, frameObject in enumerate(frameObjects[firstValidIdx + 1:]):
             if len(frameObject.getHomeMaskCentroids()) >= 5 and len(lastFrameObject.getHomeMaskCentroids()) >= 5:
@@ -383,13 +387,13 @@ class Engine:
         nextFrameObject = frameObjects[firstValidIdx]
 
         for frameObject, avgVelocity in reversed(list(zip(frameObjects[:firstValidIdx], avgVelocities[:firstValidIdx]))):
+            avgVelocity = (-avgVelocity[0], -avgVelocity[1])
             newPts = updatedPlayerPoints(nextFrameObject.getHomeMaskCentroids(),
                                                          frameObject.getHomeMaskCentroids(),
                                                          avgVelocity)
             frameObject.setHomeMaskCentroids(newPts)
             nextFrameObject = frameObject
 
-        lastVelocities = [0, 0, 0, 0, 0]
         for frameObject, avgVelocity in zip(frameObjects[firstValidIdx:], avgVelocities[firstValidIdx:]):
             newPts = updatedPlayerPoints(lastFrameObject.getHomeMaskCentroids(),
                                                          frameObject.getHomeMaskCentroids(),
@@ -408,7 +412,10 @@ class Engine:
         print avgVelocities
 
         # find first instance where two consecutive frames have at least 5 away players
-        firstValidIdx = 31
+        #firstValidIdx = 31 # gswokc-5
+        #firstValidIdx = 18 # gswokc-1
+        #firstValidIdx = 164 # gswokc-4
+        firstValidIdx = 0 #housas-1
         lastFrameObject = frameObjects[firstValidIdx]
         for i, frameObject in enumerate(frameObjects[firstValidIdx + 1:]):
             if len(frameObject.getAwayMaskCentroids()) >= 5 and len(lastFrameObject.getAwayMaskCentroids()) >= 5:
@@ -425,6 +432,7 @@ class Engine:
         nextFrameObject = frameObjects[firstValidIdx]
 
         for frameObject, avgVelocity in reversed(list(zip(frameObjects[:firstValidIdx], avgVelocities[:firstValidIdx]))):
+            avgVelocity = (-avgVelocity[0], -avgVelocity[1])
             newPts = updatedPlayerPoints(nextFrameObject.getAwayMaskCentroids(),
                                                          frameObject.getAwayMaskCentroids(),
                                                          avgVelocity)
@@ -675,6 +683,9 @@ class Engine:
         awayCircleColor = frameObjects[0].getAwayCircleColor()
         homeCircleColor = frameObjects[0].getHomeCircleColor()
 
+        x_translation = 200 if self._side == 'left' else -200
+        y_translation = 200
+
         for homographies, awayPoints, homePoints, courtPoints in zip(allHomographies, allAwayPoints, allHomePoints, allCourtPoints):
             awayPoints = np.array([awayPoints], dtype='float32')
             homePoints = np.array([homePoints], dtype='float32')
@@ -700,15 +711,16 @@ class Engine:
 
         assert len(allAdjustedHomePoints) == len(allAdjustedAwayPoints)
 
+
         for adjustedHomePts, adjustedAwayPts, frameObject, courtPts in zip(allAdjustedHomePoints, allAdjustedAwayPoints, frameObjects, allAdjustedCourtPoints):
             assert len(adjustedHomePts) == len(adjustedAwayPts)
 
             canvas = blank.copy()
             for (x_away, y_away), (x_home, y_home) in zip(adjustedAwayPts[0], adjustedHomePts[0]):
-                circs = cv2.circle(canvas, (int(x_away + 200), int(y_away + 200)), 5, homeCircleColor, -1)
-                circs = cv2.circle(canvas, (int(x_home + 200), int(y_home + 200)), 5, awayCircleColor, -1)
+                circs = cv2.circle(canvas, (int(x_away + x_translation), int(y_away + y_translation)), 5, homeCircleColor, -1)
+                circs = cv2.circle(canvas, (int(x_home + x_translation), int(y_home + y_translation)), 5, awayCircleColor, -1)
             for (x, y) in courtPts[0]:
-                circs = cv2.circle(canvas, (int(x + 200), int(y + 200)), 5, colors.BGR_RED)
+                circs = cv2.circle(canvas, (int(x + x_translation), int(y + y_translation)), 5, colors.BGR_RED)
 
             origImg = frameObject.drawPoints()
             origImg = frameObject.drawAwayMaskCentroids(origImg)
@@ -827,7 +839,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--away', type=str,
                         help="Away team",
-                        default='GSW')
+                        default='HOU')
 
 
     parser.add_argument('--side', type=str,
@@ -836,7 +848,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--home', type=str,
                         help="Home team",
-                        default='OKC')
+                        default='SAS')
 
     subparsers = parser.add_subparsers(dest='mode', help="Mode")
     showParser = subparsers.add_parser(
