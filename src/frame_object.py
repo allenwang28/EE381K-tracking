@@ -178,6 +178,7 @@ class FrameObject():
     def getAwayJerseyMask(self):
         if self._awayMask is None:
             crowdlessImg = colors.get_crowdless_image(self.getBgrImg())
+            #crowdlessImg = cv2.blur(crowdlessImg, (15,15))
             self._awayMask = colors.get_jersey_mask(crowdlessImg, self._awayColors[0], self._awayColors[1])
             self._awayMask = cluster.clusterSegmentedImage(self._awayMask)
         return self._awayMask
@@ -186,6 +187,7 @@ class FrameObject():
     def getHomeJerseyMask(self):
         if self._homeMask is None:
             crowdlessImg = colors.get_crowdless_image(self.getBgrImg())
+            #crowdlessImg = cv2.blur(crowdlessImg, (30,30))
             self._homeMask = colors.get_jersey_mask(crowdlessImg, self._homeColors[0], self._homeColors[1])
             self._homeMask = cluster.clusterSegmentedImage(self._homeMask)
         return self._homeMask
@@ -421,7 +423,12 @@ if __name__ == '__main__':
     img = cv2.imread(sampleImgPath)
     
     fo = FrameObject(img, 0, '', colors.GSW_AWAY, colors.OKC_HOME, 'left')
-    fo.showHomography()
+
+    #fo.showAwayJerseyMask()
+    fo.showAwayMaskCentroids()
+    #fo.showHomeMaskCentroids()
+    #fo.showHomeJerseyMask()
+    #fo.showHomography()
 
 
     cv2.waitKey(0)

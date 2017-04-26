@@ -24,8 +24,10 @@ fileDir = os.path.dirname(os.path.realpath(__file__))
 vidDir = os.path.join(fileDir, '..', 'videos')
 dataPath = os.path.join(fileDir, '..', 'data')
 
-defaultVidPath = os.path.join(vidDir, 'housas-1.mp4')
+#defaultVidPath = os.path.join(vidDir, 'housas-1.mp4')
 #defaultVidPath = os.path.join(vidDir, 'gswokc-5.mp4')
+#defaultVidPath = os.path.join(vidDir, 'gswokc-6.mp4')
+defaultVidPath = os.path.join(vidDir, 'gswokc-8.mp4')
 #defaultVidPath = os.path.join(vidDir, 'gswokc-4.mp4')
 
 # NOTE - this is required because we only found the 
@@ -370,7 +372,9 @@ class Engine:
         #firstValidIdx = 87 # gswokc-5
         #firstValidIdx = 19 # gswokc-1
         #firstValidIdx = 28 # gswokc-4
-        firstValidIdx = 0 # housas-1
+        #firstValidIdx = 0 # housas-1
+        #firstValidIdx = 87 # gswokc-6
+        firstValidIdx = 40 # gswokc-8
         lastFrameObject = frameObjects[firstValidIdx]
         for i, frameObject in enumerate(frameObjects[firstValidIdx + 1:]):
             if len(frameObject.getHomeMaskCentroids()) >= 5 and len(lastFrameObject.getHomeMaskCentroids()) >= 5:
@@ -415,7 +419,9 @@ class Engine:
         #firstValidIdx = 31 # gswokc-5
         #firstValidIdx = 18 # gswokc-1
         #firstValidIdx = 164 # gswokc-4
-        firstValidIdx = 0 #housas-1
+        #firstValidIdx = 0 #housas-1
+        #firstValidIdx = 31 # gswokc-6
+        firstValidIdx = 32 # gswokc-8
         lastFrameObject = frameObjects[firstValidIdx]
         for i, frameObject in enumerate(frameObjects[firstValidIdx + 1:]):
             if len(frameObject.getAwayMaskCentroids()) >= 5 and len(lastFrameObject.getAwayMaskCentroids()) >= 5:
@@ -452,7 +458,8 @@ class Engine:
         frameObjects = self.getFrameObjects()
 
         # find the first instance where two consecutive frames have all points
-        firstValidIdx = 0
+        #firstValidIdx = 0
+        firstValidIdx = 38 # gswokc-8
         lastFrameObject = frameObjects[firstValidIdx]
         for i, frameObject in enumerate(frameObjects[firstValidIdx + 1:]):
             if frameObject.allLinesDetected() and lastFrameObject.allLinesDetected():
@@ -634,9 +641,6 @@ class Engine:
                         if self._verbose:
                             print "Generating"
                         frameObject.generate()
-                        if self._verbose:
-                            frameObject.show()
-
                     except Exception as e:
                         print (e)
                 pickle.dump(self._frameObjects, open(self._frameObjectsPath, "wb"))
@@ -839,16 +843,19 @@ if __name__ == "__main__":
 
     parser.add_argument('--away', type=str,
                         help="Away team",
-                        default='HOU')
+                        #default='HOU')
+                        default='GSW')
 
 
     parser.add_argument('--side', type=str,
                         help="Side of the court",
-                        default='right')
+                        #default='right')
+                        default='left')
 
     parser.add_argument('--home', type=str,
                         help="Home team",
-                        default='SAS')
+                        #default='SAS')
+                        default='OKC')
 
     subparsers = parser.add_subparsers(dest='mode', help="Mode")
     showParser = subparsers.add_parser(
