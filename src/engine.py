@@ -25,9 +25,9 @@ vidDir = os.path.join(fileDir, '..', 'videos')
 dataPath = os.path.join(fileDir, '..', 'data')
 
 #defaultVidPath = os.path.join(vidDir, 'housas-1.mp4')
-#defaultVidPath = os.path.join(vidDir, 'gswokc-5.mp4')
+defaultVidPath = os.path.join(vidDir, 'gswokc-5.mp4')
 #defaultVidPath = os.path.join(vidDir, 'gswokc-6.mp4')
-defaultVidPath = os.path.join(vidDir, 'gswokc-8.mp4')
+#defaultVidPath = os.path.join(vidDir, 'gswokc-8.mp4')
 #defaultVidPath = os.path.join(vidDir, 'gswokc-4.mp4')
 
 # NOTE - this is required because we only found the 
@@ -52,6 +52,11 @@ HOME_TEAM_COLOR_DICT = {
      'OKC': colors.OKC_HOME,
      'SAS': colors.SAS_HOME,
 }
+
+def mouseCallback(event, x, y, flags, param):
+    if event == cv2.EVENT_LBUTTONDOWN:
+        print x, y
+        raw_input()
 
 
 # help/utility functions
@@ -270,6 +275,7 @@ class Engine:
                     print "Saving panning trajectory pickle file to {}".format(self._panningTrajectoriesPath)
         return self._panningTrajectory
 
+
     def showPoints(self):
         frameObjects = self.getFrameObjects()
 
@@ -287,6 +293,100 @@ class Engine:
             cv2.imshow('points', img)
             cv2.waitKey(20)
         out.release()
+
+    def showHomeTrackers(self):
+        if self._verbose:
+            print "Setting home trackers"
+
+        self.smoothHomeCentroids()
+
+        frameObjects = self.getFrameObjects()
+
+        firstValidIdx = 87
+        centroids = frameObjects[firstValidIdx].getHomeMaskCentroids()
+        """
+        centroids = None
+        for i, frameObject in enumerate(frameObjects):
+            if len(frameObject.getHomeMaskCentroids()) == 5:
+                firstValidIdx = i
+                centroids = frameObject.getHomeMaskCentroids()
+        """
+
+        if centroids is None:
+            raise Exception("No valid points with 5 home centroids found")
+        
+        self._homeTrackers = []
+
+        for centroid in centroids:
+            self._homeTrackers.append(Tracker(frameObjects[firstValidIdx].getBgrImg(),
+                                              centroid[1],
+                                              5,
+                                              centroid[0],
+                                              5))
+
+        savedVidPath = os.path.join(vidDir, '{}-homeTrackers.avi'.format(self._videoTitle))
+        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (self._width, self._height))
+
+        print firstValidIdx
+
+        for frameObject in frameObjects[firstValidIdx:]:
+            frame = frameObject.getBgrImg()
+            for tracker in self._homeTrackers:
+                if tracker.isLive():
+                    tracker.drawOnFrame(frame)
+
+            cv2.imshow('home tracker', frame)
+            cv2.waitKey(20)
+            out.write(frame)
+        out.release()
+
+
+    def showAwayTrackers(self):
+        if self._verbose:
+            print "Setting away trackers"
+
+        self.smoothAwayCentroids()
+
+        frameObjects = self.getFrameObjects()
+
+        firstValidIdx = 31
+        centroids = frameObjects[firstValidIdx].getAwayMaskCentroids()
+        """
+        centroids = None
+        for i, frameObject in enumerate(frameObjects):
+            if len(frameObject.getAwayMaskCentroids()) == 5:
+                firstValidIdx = i
+                centroids = frameObject.getAwayMaskCentroids()
+        """
+
+        if centroids is None:
+            raise Exception("No valid points with 5 away centroids found")
+        
+        self._awayTrackers = []
+
+        for centroid in centroids:
+            self._awayTrackers.append(Tracker(frameObjects[firstValidIdx].getBgrImg(),
+                                              centroid[1],
+                                              5,
+                                              centroid[0],
+                                              5))
+
+        savedVidPath = os.path.join(vidDir, '{}-awayTrackers.avi'.format(self._videoTitle))
+        out = cv2.VideoWriter(savedVidPath, -1, 20.0, (self._width, self._height))
+
+        print firstValidIdx
+
+        for frameObject in frameObjects[firstValidIdx:]:
+            frame = frameObject.getBgrImg()
+            for tracker in self._awayTrackers:
+                if tracker.isLive():
+                    tracker.drawOnFrame(frame)
+
+            cv2.imshow('away tracker', frame)
+            cv2.waitKey(20)
+            out.write(frame)
+        out.release()
+
 
 
     def showHomeCentroids(self):
@@ -306,7 +406,6 @@ class Engine:
             cv2.waitKey(20)
         out.release()
         
-
     def showAwayCentroids(self):
         frameObjects = self.getFrameObjects()
 
@@ -645,7 +744,7 @@ class Engine:
                         print (e)
                 pickle.dump(self._frameObjects, open(self._frameObjectsPath, "wb"))
                 if self._verbose:
-                    print "Saving fo pickle file to {}".format(self._frameObjectsPath)
+                    print "Saving frame object pickle file to {}".format(self._frameObjectsPath)
         return self._frameObjects
 
 
@@ -746,6 +845,8 @@ class Engine:
 
 
     def show(self):
+        cv2.namedWindow('frame-info')
+        cv2.setMouseCallback('frame-info', mouseCallback)
         self.fillQuadranglePoints()
         frameObjects = self.getFrameObjects()
         for frameObject in frameObjects:
@@ -758,18 +859,24 @@ def testEngineMain(args):
     if args.mode == 'show':
         if args.awayPoints:
             engine.showAwayCentroids()
-        if args.homePoints:
+        elif args.homePoints:
             engine.showHomeCentroids()
-        if args.court:
+        elif args.court:
             engine.showPoints()
-        if args.courtFilled:
+        elif args.courtFilled:
             engine.showFilledPoints()
-        if args.smoothedAwayPoints:
+        elif args.smoothedAwayPoints:
             engine.showSmoothedAwayCentroids()
-        if args.smoothedHomePoints:
+        elif args.awayTrackers:
+            engine.showAwayTrackers()
+        elif args.homeTrackers:
+            engine.showHomeTrackers()
+        elif args.smoothedHomePoints:
             engine.showSmoothedHomeCentroids()
-        if args.adjusted:
+        elif args.adjusted:
             engine.showAdjustedPoints()
+        else:
+            engine.show()
     engine.destroy()
 
 def main(args):
@@ -878,6 +985,12 @@ if __name__ == "__main__":
 
     showParser.add_argument('--smoothedHomePoints', action='store_true',
                              help='Show home mask centroids')
+
+    showParser.add_argument('--awayTrackers', action='store_true',
+                             help='Show away trackers')
+
+    showParser.add_argument('--homeTrackers', action='store_true',
+                             help='Show home trackers')
 
     showParser.add_argument('--adjusted', action='store_true',
                              help='Show all points adjusted')

@@ -132,29 +132,19 @@ if __name__ == "__main__":
     fileDir = os.path.dirname(os.path.realpath(__file__))
     vidDir = os.path.join(fileDir, '..', 'videos')
 
-    defaultVidPath = os.path.join(vidDir, 'housas-1.mp4')
-    #defaultVidPath = os.path.join(vidDir, 'gswokc-1.mp4')
+    #defaultVidPath = os.path.join(vidDir, 'housas-1.mp4')
+    defaultVidPath = os.path.join(vidDir, 'gswokc-1.mp4')
+    #defaultVidPath = os.path.join(vidDir, 'gswokc-5.mp4')
 
     cap = cv2.VideoCapture(defaultVidPath)
     # take first frame of the video
     ret,frame = cap.read()
 
-    """
-    # setup initial location of window
-    r1,h1,c1,w1 = 350,5,150,5  # simply hardcoded the values
-    track_window1 = (c1,r1,w1,h1)
-    # set up the ROI for tracking
-    roi1 = frame[r1:r1+h1, c1:c1+w1]
-    hsv_roi1 =  cv2.cvtColor(roi1, cv2.COLOR_BGR2HSV)
-    mask1 = cv2.inRange(hsv_roi1, np.array((0., 60.,32.)), np.array((180.,255.,255.)))
-    roi_hist1 = cv2.calcHist([hsv_roi1],[0],mask1,[180],[0,180])
-    cv2.normalize(roi_hist1,roi_hist1,0,255,cv2.NORM_MINMAX)
-    """
-
     # Test Tracker
     
     trackers = []
     # housas-1
+    """
     trackers.append(Tracker(frame, 350, 5, 150, 5)) # Harden
     trackers.append(Tracker(frame, 380, 5, 400, 5)) # Green
     trackers.append(Tracker(frame, 525, 5, 780, 5)) # Anderson
@@ -171,6 +161,13 @@ if __name__ == "__main__":
     trackers.append(Tracker(frame, 220, 5, 880, 5)) # Barnes
     trackers.append(Tracker(frame, 300, 5, 800, 5)) # Barnes
     """
+    trackers.append(Tracker(frame, 549, 5, 607, 5))
+    trackers.append(Tracker(frame, 1019, 5, 389, 5))
+    """
+
+    #savedVidPath = os.path.join(vidDir, 'housas-1-awayTrackers.avi')
+    #out = cv2.VideoWriter(savedVidPath, -1, 20.0, (1280, 720))
+
 
     while(1):
         ret,frame = cap.read()
@@ -193,11 +190,12 @@ if __name__ == "__main__":
 
             print("\n\n")
             cv2.imshow('img',frame)
+            #out.write(frame)
             k = cv2.waitKey(60) & 0xff
             if k == 27:
                 break
-            raw_input()
         else:
             break
     cv2.destroyAllWindows()
     cap.release()
+    #out.release()

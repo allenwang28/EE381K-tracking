@@ -424,8 +424,11 @@ if __name__ == '__main__':
     
     fo = FrameObject(img, 0, '', colors.GSW_AWAY, colors.OKC_HOME, 'left')
 
+    #cv2.imshow('graymask', fo.getGrayFlooded2())
+    fo.showPoints()
+    
     #fo.showAwayJerseyMask()
-    fo.showAwayMaskCentroids()
+    #fo.showAwayMaskCentroids()
     #fo.showHomeMaskCentroids()
     #fo.showHomeJerseyMask()
     #fo.showHomography()

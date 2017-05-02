@@ -323,10 +323,8 @@ if __name__ == '__main__':
     cv2.imshow('mask2', mask2)
     cv2.imshow('mask3', mask3)
     """
-    small = get_middle_court(img)
-    cv2.imshow('small', small)
-    jersey1 = get_jersey1_colors(img, thresh=0.8, peak_num=3)
-    mask1 = create_court_mask(img, jersey1, True)
+
+
     cv2.imshow('mask1', mask1)
     cv2.imshow('original', img)
 
